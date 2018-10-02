@@ -45,7 +45,7 @@ while [ "$dopart" == "y" ] || [ "$dopart" == "Y" ]; do
   read -p "Do you want to partition another device? (N/y) : " dopart
 done
 
-echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.3\n\nBy Dan MacDonald 2016\n\n"
+echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.33\n\nBy Dan MacDonald 2016-2018\n\n"
 echo -e "Please make sure you are connected to the Internet before running ALEZ.\n\n"
 echo -e "Available partitions:\n\n"
 
@@ -70,7 +70,7 @@ do if (( $zpconf == 1 || $zpconf == 2 )); then
    echo "Creating a single disk zpool..."
    zpool create -f -d -o feature@lz4_compress=enabled -o feature@multi_vdev_crash_dump=disabled -o \
    feature@large_dnode=disabled -o feature@sha512=disabled -o feature@skein=disabled -o feature@edonr=disabled \
-   -o feature@userobj_acccounting=disabled zroot ${partids[$zps]}
+   -o feature@userobj_accounting=disabled zroot ${partids[$zps]}
    break
  elif [ "$zpconf" == "2" ]; then
    read -p "Enter the number of the first partition : " zp1
@@ -78,7 +78,7 @@ do if (( $zpconf == 1 || $zpconf == 2 )); then
    echo "Creating a mirrored zpool..."
    zpool create zroot mirror -f -d -o feature@lz4_compress=enabled -o feature@multi_vdev_crash_dump=disabled -o \
    feature@large_dnode=disabled -o feature@sha512=disabled -o feature@skein=disabled -o feature@edonr=disabled \
-   -o feature@userobj_acccounting=disabled ${partids[$zp1]} ${partids[$zp2]}
+   -o feature@userobj_accounting=disabled ${partids[$zp1]} ${partids[$zp2]}
    break
  fi
  fi
