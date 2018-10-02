@@ -68,15 +68,17 @@ do if (( $zpconf == 1 || $zpconf == 2 )); then
  if [ "$zpconf" == "1" ]; then 
    read -p "Enter the number of the partition above that you want to create a new zpool on : " zps
    echo "Creating a single disk zpool..."
-   zpool create -f -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled -o \
-   feature@lz4_compress=enabled -o feature@spacemap_histogram=enabled -o feature@enabled_txg=enabled zroot ${partids[$zps]}
+   zpool create -f -d -o feature@lz4_compress=enabled -o feature@multi_vdev_crash_dump=disabled -o \
+   feature@large_dnode=disabled -o feature@sha512=disabled -o feature@skein=disabled -o feature@edonr=disabled \
+   -o feature@userobj_acccounting=disabled zroot ${partids[$zps]}
    break
  elif [ "$zpconf" == "2" ]; then
    read -p "Enter the number of the first partition : " zp1
    read -p "Enter the number of the second partition : " zp2
    echo "Creating a mirrored zpool..."
-   zpool create zroot mirror -f -d -o feature@async_destroy=enabled -o feature@empty_bpobj=enabled \
-   -o feature@lz4_compress=enabled -o feature@spacemap_histogram=enabled -o feature@enabled_txg=enabled ${partids[$zp1]} ${partids[$zp2]}
+   zpool create zroot mirror -f -d -o feature@lz4_compress=enabled -o feature@multi_vdev_crash_dump=disabled -o \
+   feature@large_dnode=disabled -o feature@sha512=disabled -o feature@skein=disabled -o feature@edonr=disabled \
+   -o feature@userobj_acccounting=disabled ${partids[$zp1]} ${partids[$zp2]}
    break
  fi
  fi
