@@ -95,6 +95,7 @@ zfs umount -a
 echo "Setting ZFS mount options..."
 zfs set mountpoint=/ zroot/ROOT/default
 zfs set mountpoint=legacy zroot/data/home
+zfs set atime=off zroot
 zpool set bootfs=zroot/ROOT/default zroot
 
 echo "Exporting and importing pool..."
