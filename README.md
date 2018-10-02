@@ -1,5 +1,5 @@
-Arch Linux Easy ZFS (ALEZ) installer 0.3
-========================================
+Arch Linux Easy ZFS (ALEZ) installer
+====================================
 
 **by Dan MacDonald**
 
