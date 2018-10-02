@@ -1,6 +1,6 @@
 #!/bin/bash
-# Arch Linux Easy ZFS (ALEZ) installer 0.3
-# by Dan MacDonald 2016
+# Arch Linux Easy ZFS (ALEZ) installer 0.33
+# by Dan MacDonald 2016-2018
 
 # Check script is being run as root
 if [[ $EUID -ne 0 ]]; then
