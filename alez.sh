@@ -118,7 +118,7 @@ echo "Modify HOOKS in mkinitcpio.conf..."
 sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' /mnt/etc/mkinitcpio.conf
 
 echo "Adding Arch ZFS repo key in chroot..."
-chrun "pacman-key -r 5E1ABF240EE7A126; pacman-key --lsign-key 5E1ABF240EE7A126"
+chrun "pacman-key -r F75D9D76; pacman-key --lsign-key F75D9D76"
 
 echo "Installing ZFS and GRUB in chroot..."
 chrun "pacman -Sy; pacman -S --noconfirm zfs-linux grub os-prober"
