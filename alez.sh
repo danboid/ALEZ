@@ -27,8 +27,11 @@ lsdsks() {
 	done
 }
 
+echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.33\n\nBy Dan MacDonald 2016-2018\n\n"
+echo -e "Please make sure you are connected to the Internet before running ALEZ.\n\n"
+
 # No frills BIOS/GPT partitioning
-read -p "Do you want to GPT partition any drives for a BIOS (non-UEFI) machine? (N/y): " dopart
+read -p "Do you want to select a drive to be auto-partitioned? (N/y): " dopart
 while [ "$dopart" == "y" ] || [ "$dopart" == "Y" ]; do
   lsdsks
   blkdev=-1
@@ -45,8 +48,6 @@ while [ "$dopart" == "y" ] || [ "$dopart" == "Y" ]; do
   read -p "Do you want to partition another device? (N/y) : " dopart
 done
 
-echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.33\n\nBy Dan MacDonald 2016-2018\n\n"
-echo -e "Please make sure you are connected to the Internet before running ALEZ.\n\n"
 echo -e "Available partitions:\n\n"
 
 # Read partitions into an array and print enumerated
