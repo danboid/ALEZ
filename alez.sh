@@ -108,9 +108,9 @@ zpool import `zpool import | grep id: | awk '{print $2}'` -R /mnt zroot
 echo "Installing Arch base system..."
 pacstrap /mnt base
 
-echo "Copy zpool.cache..."
-mkdir /mnt/etc/zfs
-cp /etc/zfs/zpool.cache /mnt/etc/zfs
+#echo "Copy zpool.cache..."
+#mkdir /mnt/etc/zfs
+#cp /etc/zfs/zpool.cache /mnt/etc/zfs
 
 echo "Add fstab entries..."
 echo -e "zroot/ROOT/default / zfs defaults,noatime 0 0\nzroot/data/home /home zfs defaults,noatime 0 0" >> /mnt/etc/fstab
