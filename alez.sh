@@ -107,6 +107,18 @@ zfs set mountpoint=legacy zroot/data/home
 zfs set atime=off zroot
 zpool set bootfs=zroot/ROOT/default zroot
 
+if [ "$(ls -A ${installdir})" ]; then
+    echo "Install directory ${installdir} isn't empty"
+    tempdir="$(mktemp -d)"
+    if [ -d "${tempdir}" ]; then
+        echo "Using temp directory ${tempdir}"
+        installdir="${tempdir}"
+    else
+        echo "Exiting, error occurred"
+        exit 1
+    fi
+fi
+
 echo "Exporting and importing pool..."
 zpool export zroot
 zpool import `zpool import | grep id: | awk '{print $2}'` -R ${installdir} zroot
