@@ -11,9 +11,11 @@ fi
 # Set a default locale during install to avoid mandb error when indexing man pages
 export LANG=C
 
+installdir="/mnt"
+
 # Run stuff in the ZFS chroot install function
 chrun() {
-	arch-chroot /mnt /bin/bash -c "$1"
+	arch-chroot $installdir /bin/bash -c "$1"
 }
 
 # List and enumerate attached disks function
@@ -48,13 +50,17 @@ while [ "$dopart" == "y" ] || [ "$dopart" == "Y" ]; do
   read -p "Do you want to partition another device? (N/y) : " dopart
 done
 
+echo "Partition layout:"
+lsblk
+
 echo -e "Available partitions:\n\n"
 
 # Read partitions into an array and print enumerated
-partids=(`ls /dev/disk/by-id/*`)
+partids=($(ls /dev/disk/by-id/* /dev/disk/by-partuuid/*))
 ptcount=${#partids[@]}
+
 for (( p=0; p<${ptcount}; p++ )); do
-   echo -e "$p - ${partids[p]}\n"
+   echo -e "$p - ${partids[p]} -> $(readlink ${partids[p]})\n"
 done
 
 # Try exporting zroot pool in case previous installation attempt failed
@@ -96,30 +102,42 @@ zfs create -o mountpoint=/home zroot/data/home
 zfs umount -a
 
 echo "Setting ZFS mount options..."
-zfs set mountpoint=/ zroot/ROOT/default
+zfs set mountpoint=/ zroot/ROOT/default &> /dev/null
 zfs set mountpoint=legacy zroot/data/home
 zfs set atime=off zroot
 zpool set bootfs=zroot/ROOT/default zroot
 
+if [ "$(ls -A ${installdir})" ]; then
+    echo "Install directory ${installdir} isn't empty"
+    tempdir="$(mktemp -d)"
+    if [ -d "${tempdir}" ]; then
+        echo "Using temp directory ${tempdir}"
+        installdir="${tempdir}"
+    else
+        echo "Exiting, error occurred"
+        exit 1
+    fi
+fi
+
 echo "Exporting and importing pool..."
 zpool export zroot
-zpool import `zpool import | grep id: | awk '{print $2}'` -R /mnt zroot
+zpool import `zpool import | grep id: | awk '{print $2}'` -R ${installdir} zroot
 
 echo "Installing Arch base system..."
-pacstrap /mnt base
+pacstrap ${installdir} base
 
 #echo "Copy zpool.cache..."
-#mkdir /mnt/etc/zfs
-#cp /etc/zfs/zpool.cache /mnt/etc/zfs
+#mkdir ${installdir}/etc/zfs
+#cp /etc/zfs/zpool.cache ${installdir}/etc/zfs
 
 echo "Add fstab entries..."
-echo -e "zroot/ROOT/default / zfs defaults,noatime 0 0\nzroot/data/home /home zfs defaults,noatime 0 0" >> /mnt/etc/fstab
+echo -e "zroot/ROOT/default / zfs defaults,noatime 0 0\nzroot/data/home /home zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
 
 echo "Add Arch ZFS pacman repo..."
-echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> /mnt/etc/pacman.conf
+echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> ${installdir}/etc/pacman.conf
 
 echo "Modify HOOKS in mkinitcpio.conf..."
-sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' /mnt/etc/mkinitcpio.conf
+sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' ${installdir}/etc/mkinitcpio.conf
 
 echo "Adding Arch ZFS repo key in chroot..."
 chrun "pacman-key -r F75D9D76; pacman-key --lsign-key F75D9D76"
@@ -129,7 +147,7 @@ chrun "pacman -Sy; pacman -S --noconfirm zfs-linux grub os-prober"
 
 echo "Adding Arch ZFS entry to GRUB menu..."
 awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
-	zfs=zroot/ROOT/default rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' /mnt/boot/grub/grub.cfg
+	zfs=zroot/ROOT/default rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' ${installdir}/boot/grub/grub.cfg
 echo "Update initial ramdisk (initrd) with ZFS support..."
 chrun "mkinitcpio -p linux"
 
@@ -137,11 +155,12 @@ echo -e "Enable systemd ZFS service...\n"
 chrun "systemctl enable zfs.target"
 
 # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
-echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > /mnt/home/partlink.sh
+echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
+echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
 
 echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
 chrun "sh /home/partlink.sh"
-rm -f /mnt/home/partlink.sh
+rm -f ${installdir}/home/partlink.sh
 
 lsdsks
 
