@@ -126,10 +126,6 @@ zpool import `zpool import | grep id: | awk '{print $2}'` -R ${installdir} zroot
 echo "Installing Arch base system..."
 pacstrap ${installdir} base
 
-#echo "Copy zpool.cache..."
-#mkdir ${installdir}/etc/zfs
-#cp /etc/zfs/zpool.cache ${installdir}/etc/zfs
-
 echo "Add fstab entries..."
 echo -e "zroot/ROOT/default / zfs defaults,noatime 0 0\nzroot/data/home /home zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
 
