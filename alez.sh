@@ -1,10 +1,10 @@
 #!/bin/bash
-# Arch Linux Easy ZFS (ALEZ) installer 0.33
+# Arch Linux Easy ZFS (ALEZ) installer 0.333
 # by Dan MacDonald 2016-2018
 
 # Check script is being run as root
 if [[ $EUID -ne 0 ]]; then
-   echo "Arch Linux Easy ZFS installer must be run as root"
+   echo "The Arch Linux Easy ZFS installer must be run as root"
    exit 1
 fi
 
@@ -29,11 +29,11 @@ lsdsks() {
 	done
 }
 
-echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.33\n\nBy Dan MacDonald 2016-2018\n\n"
+echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.333\n\nBy Dan MacDonald 2016-2018\n\n"
 echo -e "Please make sure you are connected to the Internet before running ALEZ.\n\n"
 
 # No frills BIOS/GPT partitioning
-read -p "Do you want to select a drive to be auto-partitioned? (N/y): " dopart
+read -p "Do you want to select a (non-UEFI) drive to be auto-partitioned? (N/y): " dopart
 while [ "$dopart" == "y" ] || [ "$dopart" == "Y" ]; do
   lsdsks
   blkdev=-1
@@ -178,4 +178,4 @@ echo "Exporting the pool"
 zfs umount -a
 zpool export zroot
 
-echo "Arch ZFS installation complete"
+echo "Installation complete. You may now reboot into your Arch ZFS install."
