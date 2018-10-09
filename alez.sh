@@ -1,17 +1,55 @@
 #!/bin/bash
+
 # Arch Linux Easy ZFS (ALEZ) installer 0.333
 # by Dan MacDonald 2016-2018
+
+# Exit on error
+set -o errexit -o errtrace
+
+# Set a default locale during install to avoid mandb error when indexing man pages
+export LANG=C
+
+# Colors
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+installdir="/mnt"
+archzfs_pgp_key="F75D9D76"
+zroot="zroot"
+
+declare -a zpool_props
+zpool_props=(
+    'feature@lz4_compress=enabled'
+    'feature@multi_vdev_crash_dump=disabled'
+    'feature@large_dnode=disabled'
+    'feature@sha512=disabled'
+    'feature@skein=disabled'
+    'feature@edonr=disabled'
+    'feature@userobj_accounting=disabled'
+)
+
+print_props() {
+    # Prefix each property with '-o '
+    echo "${zpool_props[@]/#/-o }"
+}
+
+unmount_cleanup() {
+    { zfs umount -a && zpool export "${zroot}" || : ; } &> /dev/null
+}
+
+error_cleanup() {
+    echo -e "${RED}WARNING:${NC} Error occurred. Unmounted datasets and exported ${zpool}"
+    # Other cleanup
+}
+
+trap error_cleanup ERR     # Run on error
+trap unmount_cleanup EXIT  # Run on exit
 
 # Check script is being run as root
 if [[ $EUID -ne 0 ]]; then
    echo "The Arch Linux Easy ZFS installer must be run as root"
    exit 1
 fi
-
-# Set a default locale during install to avoid mandb error when indexing man pages
-export LANG=C
-
-installdir="/mnt"
 
 # Run stuff in the ZFS chroot install function
 chrun() {
@@ -27,6 +65,22 @@ lsdsks() {
 	for (( d=0; d<${ndisks}; d++ )); do
 	   echo -e "$d - ${disks[d]}\n"
 	done
+}
+
+lsparts() {
+    echo -e "\nPartition layout:"
+    lsblk
+
+    echo -e "If you used this script to create your partitions, choose partitions ending with -part2\n\n"
+    echo -e "Available partitions:\n\n"
+
+    # Read partitions into an array and print enumerated
+    partids=($(ls /dev/disk/by-id/* /dev/disk/by-partuuid/*))
+    ptcount=${#partids[@]}
+
+    for (( p=0; p<${ptcount}; p++ )); do
+        echo -e "$p - ${partids[p]} -> $(readlink ${partids[p]})\n"
+    done
 }
 
 echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.333\n\nBy Dan MacDonald 2016-2018\n\n"
@@ -50,62 +104,40 @@ while [ "$dopart" == "y" ] || [ "$dopart" == "Y" ]; do
   read -p "Do you want to partition another device? (N/y) : " dopart
 done
 
-echo "Partition layout:"
-lsblk
-
-echo -e "Available partitions:\n\n"
-
-# Read partitions into an array and print enumerated
-partids=($(ls /dev/disk/by-id/* /dev/disk/by-partuuid/*))
-ptcount=${#partids[@]}
-
-for (( p=0; p<${ptcount}; p++ )); do
-   echo -e "$p - ${partids[p]} -> $(readlink ${partids[p]})\n"
-done
-
-# Try exporting zroot pool in case previous installation attempt failed
-zfs umount -a &> /dev/null
-zpool export zroot &> /dev/null
-
 # Create zpool
 zpconf="0"
-echo -e "If you used this script to create your partitions, choose partitions ending with -part2\n\n"
-while read -p "Do you want to create a single or double disk (mirrored) zpool? (1/2) : " zpconf 
-do if (( $zpconf == 1 || $zpconf == 2 )); then
- if [ "$zpconf" == "1" ]; then 
-   read -p "Enter the number of the partition above that you want to create a new zpool on : " zps
-   echo "Creating a single disk zpool..."
-   zpool create -f -d -o feature@lz4_compress=enabled -o feature@multi_vdev_crash_dump=disabled -o \
-   feature@large_dnode=disabled -o feature@sha512=disabled -o feature@skein=disabled -o feature@edonr=disabled \
-   -o feature@userobj_accounting=disabled zroot ${partids[$zps]}
-   break
- elif [ "$zpconf" == "2" ]; then
-   read -p "Enter the number of the first partition : " zp1
-   read -p "Enter the number of the second partition : " zp2
-   echo "Creating a mirrored zpool..."
-   zpool create zroot mirror -f -d -o feature@lz4_compress=enabled -o feature@multi_vdev_crash_dump=disabled -o \
-   feature@large_dnode=disabled -o feature@sha512=disabled -o feature@skein=disabled -o feature@edonr=disabled \
-   -o feature@userobj_accounting=disabled ${partids[$zp1]} ${partids[$zp2]}
-   break
- fi
- fi
- echo "Please enter 1 or 2"
+while read -p "Do you want to create a single or double disk (mirrored) zpool? (1/2) : " zpconf ; do 
+    if (( $zpconf == 1 || $zpconf == 2 )); then
+        lsparts
+        if [ "$zpconf" == "1" ]; then 
+            read -p "Enter the number of the partition above that you want to create a new zpool on : " zps
+            echo "Creating a single disk zpool..."
+            zpool create -f -d -m none $(print_props) "${zroot}" "${partids[$zps]}"
+            break
+        elif [ "$zpconf" == "2" ]; then
+            read -p "Enter the number of the first partition : " zp1
+            read -p "Enter the number of the second partition : " zp2
+            echo "Creating a mirrored zpool..."
+            zpool create "${zroot}" mirror -f -d -m none $(print_props) "${partids[$zp1]}" "${partids[$zp2]}"
+            break
+        fi
+    fi
+    echo "Please enter 1 or 2"
 done 
 
 echo "Creating datasets..."
-zfs create -o mountpoint=none zroot/data
-zfs create -o mountpoint=none zroot/ROOT
-zfs create -o mountpoint=/ zroot/ROOT/default
-zfs create -o mountpoint=/home zroot/data/home
+zfs create -o mountpoint=none "${zroot}"/data
+zfs create -o mountpoint=none "${zroot}"/ROOT
+{ zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
+zfs create -o mountpoint=/home "${zroot}"/data/home
 
 # This umount is not always required but can prevent problems with the next command
 zfs umount -a
 
 echo "Setting ZFS mount options..."
-zfs set mountpoint=/ zroot/ROOT/default &> /dev/null
-zfs set mountpoint=legacy zroot/data/home
-zfs set atime=off zroot
-zpool set bootfs=zroot/ROOT/default zroot
+zfs set mountpoint=legacy "${zroot}"/data/home
+zfs set atime=off "${zroot}"
+zpool set bootfs="${zroot}"/ROOT/default "${zroot}"
 
 if [ "$(ls -A ${installdir})" ]; then
     echo "Install directory ${installdir} isn't empty"
@@ -120,14 +152,16 @@ if [ "$(ls -A ${installdir})" ]; then
 fi
 
 echo "Exporting and importing pool..."
-zpool export zroot
-zpool import `zpool import | grep id: | awk '{print $2}'` -R ${installdir} zroot
+zpool export "${zroot}"
+zpool import "$(zpool import | grep id: | awk '{print $2}')" -R "${installdir}" "${zroot}"
+
+{ pacman-key -r "${archzfs_pgp_key}" && pacman-key --lsign-key "${archzfs_pgp_key}" ; } &> /dev/null
 
 echo "Installing Arch base system..."
 pacstrap ${installdir} base
 
 echo "Add fstab entries..."
-echo -e "zroot/ROOT/default / zfs defaults,noatime 0 0\nzroot/data/home /home zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
+echo -e "${zroot}/ROOT/default / zfs defaults,noatime 0 0\n${zroot}/data/home /home zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
 
 echo "Add Arch ZFS pacman repo..."
 echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> ${installdir}/etc/pacman.conf
@@ -143,7 +177,7 @@ chrun "pacman -Sy; pacman -S --noconfirm zfs-linux grub os-prober"
 
 echo "Adding Arch ZFS entry to GRUB menu..."
 awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
-	zfs=zroot/ROOT/default rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' ${installdir}/boot/grub/grub.cfg
+	'"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' ${installdir}/boot/grub/grub.cfg
 echo "Update initial ramdisk (initrd) with ZFS support..."
 chrun "mkinitcpio -p linux"
 
@@ -155,7 +189,7 @@ echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; 
 echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
 
 echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
-chrun "sh /home/partlink.sh"
+chrun "sh /home/partlink.sh > /dev/null 2>&1"
 rm -f ${installdir}/home/partlink.sh
 
 lsdsks
@@ -173,9 +207,5 @@ while [ "$dogrub" == "y" ] || [ "$dogrub" == "Y" ]; do
   fi
   read -p "Do you want to install GRUB to another disk? (N/y) : " dogrub
 done
-
-echo "Exporting the pool"
-zfs umount -a
-zpool export zroot
 
 echo "Installation complete. You may now reboot into your Arch ZFS install."
