@@ -130,6 +130,8 @@ zfs create -o mountpoint=none "${zroot}"/data
 zfs create -o mountpoint=none "${zroot}"/ROOT
 { zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
 zfs create -o mountpoint=/home "${zroot}"/data/home
+zfs create -o canmount=off "${zroot}"/boot
+zfs create -o mountpoint=/boot/grub "${zroot}"/boot/grub
 
 # This umount is not always required but can prevent problems with the next command
 zfs umount -a
