@@ -1,7 +1,7 @@
 Arch Linux Easy ZFS (ALEZ) installer
 ====================================
 
-**by Dan MacDonald**
+**by Dan MacDonald and John Ramsden**
 
 
 
@@ -10,7 +10,7 @@ WHAT IS ALEZ?
 
 ALEZ (pronounced like 'ales', as in beer) is a shell script to simplify the process of installing Arch Linux using the ZFS file system.
 
-ALEZ automates the processes of partitioning disks, creating and configuring a zpool and some basic datasets, installing a base Arch Linux system and configuring and installing the GRUB bootloader so that they all play nicely with ZFS. The datasets are structured so as to be usable for boot environments.
+ALEZ automates the processes of partitioning disks, creating and configuring a ZFS pool and some basic datasets, installing a base Arch Linux system and configuring and installing the GRUB bootloader so that they all play nicely with ZFS. The datasets are structured so as to be usable for ([zedenv](https://github.com/johnramsden/zedenv)) boot environments.
 
 
 LIMITATIONS
@@ -24,7 +24,7 @@ ALEZ has a few limitations you need to be aware of:
 
 * This script currently only supports partitioning or installing to drives using GPT which requires a small (1-2 MB) unformatted BIOS bootloader partition. This is created automatically by the partitioning feature of ALEZ. ALEZ does not support creating MBR partitions. 
 
-* ALEZ currently only supports creating single or double-drive (mirrored) zpools - no RAIDZ support yet.
+* ALEZ currently only supports creating single or double-drive (mirrored) pools - there is no RAIDZ support yet.
 
 
 HOW DO I USE IT?
@@ -38,4 +38,4 @@ See [this link for instructions on creating a custom Arch installer with ZFS sup
 
 Otherwise, add [this repo to your /etc/pacman.conf](https://wiki.archlinux.org/index.php/Unofficial_user_repositories#archzfs)
 
-Apart from having one of those three ZFS packages installed, ALEZ must be run as root plus you need a working internet connection so that it can download the required packages. Once you have booted an Arch install disc, you have a suitable ZFS package installed and you have copied the script onto your system (all this is done for you with archlinux-alez) simply run alez.sh from any location and answer the few simple questions it prompts you for.
+Apart from having one of those three ZFS packages installed, ALEZ must be run as root plus you need a working internet connection so that it can download the required packages. Once you have booted an Arch install disc, you have a suitable ZFS package installed and you have copied the script onto your system (all this is done for you with archlinux-alez) simply run `alez` from any location and answer the simple questions it prompts you for.

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Arch Linux Easy ZFS (ALEZ) installer 0.333
-# by Dan MacDonald 2016-2018
+# Arch Linux Easy ZFS (ALEZ) installer 0.4
+# by Dan MacDonald 2016-2018 with contributions from John Ramsden
 
 # Exit on error
 set -o errexit -o errtrace
@@ -83,7 +83,7 @@ lsparts() {
     done
 }
 
-echo -e "\nArch Linux Easy ZFS (ALEZ) installer 0.333\n\nBy Dan MacDonald 2016-2018\n\n"
+echo -e "\nThe Arch Linux Easy ZFS (ALEZ) installer v0.4\n\n"
 echo -e "Please make sure you are connected to the Internet before running ALEZ.\n\n"
 
 # No frills BIOS/GPT partitioning
