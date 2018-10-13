@@ -34,7 +34,10 @@ print_props() {
 }
 
 unmount_cleanup() {
-    { zfs umount -a && zpool export "${zroot}" || : ; } &> /dev/null
+    {
+        if mount | grep grub; then umount "${installdir}/boot/grub"; fi
+        zfs umount -a && zpool export "${zroot}" || : ;
+    } &> /dev/null
 }
 
 error_cleanup() {
@@ -127,17 +130,16 @@ done
 
 echo "Creating datasets..."
 zfs create -o mountpoint=none "${zroot}"/data
+zfs create -o mountpoint=legacy "${zroot}"/data/home
 zfs create -o mountpoint=none "${zroot}"/ROOT
-{ zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
-zfs create -o mountpoint=/home "${zroot}"/data/home
 zfs create -o canmount=off "${zroot}"/boot
-zfs create -o mountpoint=/boot/grub "${zroot}"/boot/grub
+zfs create -o mountpoint=legacy "${zroot}"/boot/grub
+{ zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
 
 # This umount is not always required but can prevent problems with the next command
 zfs umount -a
 
 echo "Setting ZFS mount options..."
-zfs set mountpoint=legacy "${zroot}"/data/home
 zfs set atime=off "${zroot}"
 zpool set bootfs="${zroot}"/ROOT/default "${zroot}"
 
@@ -157,13 +159,16 @@ echo "Exporting and importing pool..."
 zpool export "${zroot}"
 zpool import "$(zpool import | grep id: | awk '{print $2}')" -R "${installdir}" "${zroot}"
 
+mkdir -p "${installdir}/boot/grub"
+mount -t zfs "${zroot}"/boot/grub "${installdir}/boot/grub"
+
 { pacman-key -r "${archzfs_pgp_key}" && pacman-key --lsign-key "${archzfs_pgp_key}" ; } &> /dev/null
 
 echo "Installing Arch base system..."
 pacstrap ${installdir} base
 
 echo "Add fstab entries..."
-echo -e "${zroot}/ROOT/default / zfs defaults,noatime 0 0\n${zroot}/data/home /home zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
+echo -e "${zroot}/ROOT/default / zfs defaults,noatime 0 0\n${zroot}/data/home /home zfs defaults,noatime 0 0\n${zroot}/boot/grub /boot/grub zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
 
 echo "Add Arch ZFS pacman repo..."
 echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> ${installdir}/etc/pacman.conf
@@ -210,4 +215,5 @@ while [ "$dogrub" == "y" ] || [ "$dogrub" == "Y" ]; do
   read -p "Do you want to install GRUB to another disk? (N/y) : " dogrub
 done
 
+unmount_cleanup
 echo "Installation complete. You may now reboot into your Arch ZFS install."
