@@ -114,10 +114,14 @@ install_arch(){
     pacstrap ${installdir} base
 
     echo "Add fstab entries..."
-    genfstab -U "${installdir}" | \
-    if [[ "${install_type}" =~ ^(u|U)$ ]]; then
-        sed "s:/mnt/mnt:/mnt:g"
-    fi > "${installdir}/etc/fstab"
+    fstab_output="$(genfstab -U "${installdir}")"
+    (
+        if [[ "${install_type}" =~ ^(u|U)$ ]]; then
+            echo "${fstab_output}" | sed "s:/mnt/mnt:/mnt:g"
+        else
+            echo "${fstab_output}"
+        fi
+    ) > "${installdir}/etc/fstab"
 
     # echo "Add fstab entries..."
     # echo -e "${zroot}/ROOT/default / zfs defaults,noatime 0 0\n${zroot}/data/home /home zfs defaults,noatime 0 0\n${zroot}/boot/grub /boot/grub zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
