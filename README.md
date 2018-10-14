@@ -20,7 +20,7 @@ ALEZ has a few limitations you need to be aware of:
 
 * 64 bit, x86 (amd64) Arch is the only platform supported by the Arch ZFS repo and hence this script.
 
-* No UEFI or automated dual-booting support.
+* No automated multiboot support.
 
 * This script currently only supports partitioning or installing to drives using GPT which requires a small (1-2 MB) unformatted BIOS bootloader partition. This is created automatically by the partitioning feature of ALEZ. ALEZ does not support creating MBR partitions. 
 
