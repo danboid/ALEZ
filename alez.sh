@@ -157,9 +157,8 @@ add_grub_entry(){
 }
 
 grub_hacks(){
-    # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
-    echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
-    echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
+    gen_partlink "/dev/disk/by-id/" > "${installdir}/home/partlink.sh"
+    gen_partlink "/dev/disk/by-partuuid/" >> "${installdir}/home/partlink.sh"
 
     echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
     chrun "sh /home/partlink.sh > /dev/null 2>&1"
@@ -188,6 +187,17 @@ install_grub(){
         fi
         read -p "Do you want to install GRUB to another disk? (N/y) : " dogrub
     done
+}
+
+gen_partlink(){
+    cat <<- EOF
+        ptids=(\$(cd ${1} && ls));
+        nidcount=\${#ptids[@]};
+        for (( c=0; c<\${nidcount}; c++ )); do
+            devs[c]=\$(readlink ${1}\${ptids[\$c]} | sed 's/\.\.\/\.\.\///');
+            ln -s /dev/\${devs[c]} /dev/\${ptids[c]};
+        done;
+EOF
 }
 
 install_grub_efi(){
