@@ -18,7 +18,6 @@ NC='\033[0m' # No Color
 installdir="/mnt"
 archzfs_pgp_key="F75D9D76"
 zroot="zroot"
-esp_mountpoint="/mnt/efi"
 
 declare -a zpool_bios_features
 zpool_bios_features=(
@@ -48,8 +47,9 @@ error_cleanup() {
     # Other cleanup
 }
 
-# Run stuff in the ZFS chroot install function
+# Run stuff in the ZFS chroot install function with optional message
 chrun() {
+    [[ ! -z "${2}" ]] && echo "${2}"
 	arch-chroot "${installdir}" /bin/bash -c "$1"
 }
 
@@ -84,7 +84,7 @@ lsparts() {
 
 bios_partitioning(){
     echo "GPT BIOS partitioning ${1}..."
-    mdadm --zero-superblock --force ${1} &> /dev/null
+    mdadm --zero-superblock --force "${1}" &> /dev/null
 
     parted --script "${1}" \
         mklabel gpt \
@@ -94,18 +94,19 @@ bios_partitioning(){
 
 uefi_partitioning(){
     echo "GPT UEFI partitioning ${1}..."
-    # parted -a optimal --script "${1}" \
-    #     mklabel gpt \
-    #     mkpart primary fat32 0% 2147483648B set 1 esp on \
-    #     mkpart primary 2 100%
 
-    # --new=partnum:start:end
-    # --typecode=partnum:{hexcode|GUID}
+    esp_size=512
+    if [[ "${bootloader}" =~ ^(s|S) ]]; then
+        read -p "Enter the size of the esp (in MiB), 1024 or greater reccomended to hold multiple kernels : " esp_size
+        while [ "$esp_size" -lt "512" ]; do
+            read -p "Enter the size of the esp (in MiB), 1024 or greater reccomended to hold multiple kernels : " esp_size
+        done
+    fi
 
-    mdadm --zero-superblock --force ${1} &> /dev/null
-    sgdisk --zap-all ${1}
-    sgdisk --new=1:1M:+2048M --typecode=1:EF00 ${1}
-    sgdisk --new=2:0:0 --typecode=2:BF01 ${1}
+    mdadm --zero-superblock --force "${1}" &> /dev/null
+    sgdisk --zap-all "${1}"
+    sgdisk --new="1:1M:+${esp_size}M" --typecode=1:EF00 "${1}"
+    sgdisk --new=2:0:0 --typecode=2:BF01 "${1}"
 
 }
 
@@ -116,39 +117,32 @@ install_arch(){
     echo "Add fstab entries..."
     fstab_output="$(genfstab -U "${installdir}")"
     (
-        if [[ "${install_type}" =~ ^(u|U)$ ]]; then
+        if [[ "${install_type}" =~ ^(u|U)$ ]] && ! [[ "${bootloader}" =~ ^(g|G) ]]; then
             echo "${fstab_output}" | sed "s:/mnt/mnt:/mnt:g"
         else
             echo "${fstab_output}"
         fi
     ) > "${installdir}/etc/fstab"
 
-    # echo "Add fstab entries..."
-    # echo -e "${zroot}/ROOT/default / zfs defaults,noatime 0 0\n${zroot}/data/home /home zfs defaults,noatime 0 0\n${zroot}/boot/grub /boot/grub zfs defaults,noatime 0 0" >> ${installdir}/etc/fstab
-
     echo "Add Arch ZFS pacman repo..."
-    echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> ${installdir}/etc/pacman.conf
+    echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> "${installdir}/etc/pacman.conf"
 
     echo "Modify HOOKS in mkinitcpio.conf..."
-    sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' ${installdir}/etc/mkinitcpio.conf
+    sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' "${installdir}/etc/mkinitcpio.conf"
 
-    echo "Adding Arch ZFS repo key in chroot..."
-    chrun "pacman-key -r F75D9D76; pacman-key --lsign-key F75D9D76"
-
-    echo "Installing ZFS in chroot..."
-    chrun "pacman -Sy; pacman -S --noconfirm zfs-linux"
+    chrun "pacman-key -r F75D9D76; pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
+    chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS in chroot..."
 
     echo -e "Enable systemd ZFS service...\n"
     chrun "systemctl enable zfs.target"
 }
 
 install_grub(){
-    echo "Installing GRUB in chroot..."
-    chrun "pacman -S --noconfirm grub os-prober"
+    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..."
 
     echo "Adding Arch ZFS entry to GRUB menu..."
     awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
-        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' ${installdir}/boot/grub/grub.cfg
+        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
 
     # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
     echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
@@ -166,8 +160,7 @@ install_grub(){
     while [ "$dogrub" == "y" ] || [ "$dogrub" == "Y" ]; do
         read -p "Enter the number of the disk to install GRUB to : " gn
         if [ "$gn" -ge 0 -a "$gn" -le "$ndisks" ]; then
-                echo "Installing GRUB to /dev/${disks[$gn]}..."
-                chrun "grub-install /dev/${disks[$gn]}"
+                chrun "grub-install /dev/${disks[$gn]}" "Installing GRUB to /dev/${disks[$gn]}..."
         else
                 echo "Please enter a number between 0 and $(($ndisks-1))"
         fi
@@ -175,8 +168,27 @@ install_grub(){
     done
 }
 
+install_grub_efi(){
+    chrun "pacman -S --noconfirm grub efibootmgr os-prober" "Installing GRUB for UEFI in chroot..."
+
+    echo "Adding Arch ZFS entry to GRUB menu..."
+    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
+        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
+
+    # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
+    echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
+    echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
+
+    echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
+    chrun "sh /home/partlink.sh > /dev/null 2>&1"
+    rm -f ${installdir}/home/partlink.sh
+
+    # Install GRUB
+    chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" "Installing grub-efi to ${1}"
+}
+
 install_sdboot(){
-    chrun "bootctl --path=${1} install"
+    chrun "bootctl --path=${1} install" "Installing systemd-boot to ${1}"
     mkdir -p "${installdir}/${1}/loader/entries"
     cat <<- EOF > "${installdir}/${1}/loader/entries/zedenv-default.conf"
         title           [default] (Arch Linux)
@@ -223,6 +235,22 @@ while ! [[ "${install_type}" =~ ^(u|U|b|B)$ ]]; do
     read -p "Install type UEFI [u] or non-UEFI/BIOS? (u/b): " install_type
 done
 
+if [[ "${install_type}" =~ ^(u|U)$ ]]; then
+    read -p "UEFI bootloader systemd-boot [s] or GRUB on ZFS [g]? (s/g): " bootloader
+    while ! [[ "${bootloader}" =~ ^(s|S|g|G)$ ]]; do
+        read -p "UEFI bootloader systemd-boot [s] or GRUB on ZFS [g]? (s/g): " bootloader
+    done
+
+    if [[ "${bootloader}" =~ ^(s|S)$ ]]; then
+        esp_mountpoint="/mnt/efi"
+    else
+        esp_mountpoint="/boot/efi"
+    fi
+
+else
+    bootloader="g"
+fi
+
 # No frills GPT partitioning
 read -p "Do you want to select a drive to be auto-partitioned? (N/y): " dopart
 while [[ "$dopart" =~ ^(y|Y)$ ]]; do
@@ -259,9 +287,9 @@ while read -p "Do you want to create a single or double disk (mirrored) zpool? (
         read -p "Enter the number of the partition above that you want to create a new zpool on : " zps
         echo "Creating a single disk zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
-            zpool create -f -d -m none $(print_features) "${zroot}" "${partids[$zps]}"
+            zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
         else
-            zpool create -f -d -m none "${zroot}" "${partids[$zps]}"
+            zpool create -f -d -m none -o ashift=12 "${zroot}" "${partids[$zps]}"
         fi
         break
     elif [ "$zpconf" == "2" ]; then
@@ -270,9 +298,10 @@ while read -p "Do you want to create a single or double disk (mirrored) zpool? (
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             zpool create "${zroot}" mirror -f -d -m none \
+                -o ashift=12 \
                 $(print_features) "${partids[$zp1]}" "${partids[$zp2]}"
         else
-            zpool create "${zroot}" mirror -f -d -m none "${partids[$zp1]}" "${partids[$zp2]}"
+            zpool create "${zroot}" mirror -f -d -m none -o ashift=12 "${partids[$zp1]}" "${partids[$zp2]}"
         fi
         break
     fi
@@ -286,8 +315,8 @@ zfs create -o mountpoint=legacy "${zroot}"/data/home
 
 { zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
 
-# BIOS only datasets
-if [[ "${install_type}" =~ ^(b|B)$ ]]; then
+# GRUB only datasets
+if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
     zfs create -o canmount=off "${zroot}"/boot
     zfs create -o mountpoint=legacy "${zroot}"/boot/grub
 fi
@@ -295,8 +324,9 @@ fi
 # This umount is not always required but can prevent problems with the next command
 zfs umount -a
 
-echo "Setting ZFS mount options..."
+echo "Setting ZFS properties..."
 zfs set atime=off "${zroot}"
+zfs set compression=on "${zroot}"
 zpool set bootfs="${zroot}"/ROOT/default "${zroot}"
 
 check_mountdir
@@ -308,18 +338,24 @@ zpool import "$(zpool import | grep id: | awk '{print $2}')" -R "${installdir}" 
 mkdir -p "${installdir}/home"
 mount -t zfs "${zroot}/data/home" "${installdir}/home"
 
-if [[ "${install_type}" =~ ^(b|B)$ ]]; then
+if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
     mkdir -p "${installdir}/boot/grub"
     mount -t zfs "${zroot}/boot/grub" "${installdir}/boot/grub"
-else
+fi
+
+if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     lsparts
     read -p "Enter the number of the partition above that you want to use for an esp : " esp
     efi_partition="${partids[$esp]}"
     mkfs.fat -F 32 "${efi_partition}"
+
     mkdir -p "${installdir}${esp_mountpoint}" "${installdir}/boot"
     mount "${efi_partition}" "${installdir}${esp_mountpoint}"
-    mkdir -p "${installdir}${esp_mountpoint}/env/zedenv-default"
-    mount --bind "${installdir}${esp_mountpoint}/env/zedenv-default" "${installdir}/boot"
+
+    if [[ "${bootloader}" =~ ^(s|S)$ ]]; then
+        mkdir -p "${installdir}${esp_mountpoint}/env/zedenv-default"
+        mount --bind "${installdir}${esp_mountpoint}/env/zedenv-default" "${installdir}/boot"
+    fi
 fi
 
 { pacman-key -r "${archzfs_pgp_key}" && pacman-key --lsign-key "${archzfs_pgp_key}" ; } &> /dev/null
@@ -329,7 +365,11 @@ install_arch
 if [[ "${install_type}" =~ ^(b|B)$ ]]; then
     install_grub
 else
-    install_sdboot ${esp_mountpoint}
+    if [[ "${bootloader}" =~ ^(s|S)$ ]]; then
+        install_sdboot "${esp_mountpoint}"
+    else
+        install_grub_efi "${esp_mountpoint}"
+    fi
 fi
 
 echo "Update initial ramdisk (initrd) with ZFS support..."
