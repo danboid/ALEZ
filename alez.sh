@@ -204,12 +204,21 @@ install_grub_efi(){
 install_sdboot(){
     chrun "bootctl --path=${1} install" "Installing systemd-boot to ${1}"
     mkdir -p "${installdir}/${1}/loader/entries"
+    if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+    cat <<- EOF > "${installdir}/${1}/loader/entries/zedenv-default.conf"
+        title           [default] (Arch Linux)
+        linux           /env/zedenv-default/vmlinuz-linux-lts
+        initrd          /env/zedenv-default/initramfs-linux-lts.img
+        options         zfs=${zroot}/ROOT/default rw
+EOF
+	else
     cat <<- EOF > "${installdir}/${1}/loader/entries/zedenv-default.conf"
         title           [default] (Arch Linux)
         linux           /env/zedenv-default/vmlinuz-linux
         initrd          /env/zedenv-default/initramfs-linux.img
         options         zfs=${zroot}/ROOT/default rw
 EOF
+fi
     cat <<- EOF > "${installdir}/${1}/loader/loader.conf"
        timeout 3
        default zedenv-default
