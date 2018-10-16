@@ -155,6 +155,16 @@ add_grub_entry(){
         '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
 	fi
 }
+
+grub_hacks(){
+	# Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
+    echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
+    echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
+
+    echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
+    chrun "sh /home/partlink.sh > /dev/null 2>&1"
+    rm -f ${installdir}/home/partlink.sh
+}
 	
 
 install_grub(){
@@ -162,17 +172,11 @@ install_grub(){
 
 	add_grub_entry
     
-    # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
-    echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
-    echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
-
-    echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
-    chrun "sh /home/partlink.sh > /dev/null 2>&1"
-    rm -f ${installdir}/home/partlink.sh
+    grub_hacks
 
     lsdsks
 
-    # Install GRUB
+    # Install GRUB BIOS
     echo -e "NOTE: If you have installed Arch onto a mirrored pool then you should install GRUB onto both disks\n"
     read -p "Do you want to install GRUB onto any of the attached disks? (N/y): " dogrub
     while [ "$dogrub" == "y" ] || [ "$dogrub" == "Y" ]; do
@@ -191,15 +195,9 @@ install_grub_efi(){
     
     add_grub_entry
 
-    # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
-    echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
-    echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
+	grub_hacks
 
-    echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
-    chrun "sh /home/partlink.sh > /dev/null 2>&1"
-    rm -f ${installdir}/home/partlink.sh
-
-    # Install GRUB
+    # Install GRUB EFI
     chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" "Installing grub-efi to ${1}"
 }
 
