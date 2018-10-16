@@ -145,10 +145,8 @@ install_arch(){
     chrun "systemctl enable zfs.target"
 }
 
-install_grub(){
-    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..."
-
-    echo "Adding Arch ZFS entry to GRUB menu..."
+add_grub_entry(){
+	echo "Adding Arch ZFS entry to GRUB menu..."
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
     awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux-lts \
         '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux-lts.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
@@ -156,6 +154,14 @@ install_grub(){
     awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
         '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
 	fi
+}
+	
+
+install_grub(){
+    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..."
+
+	add_grub_entry
+    
     # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
     echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
     echo -e "ptids=(\`cd /dev/disk/by-partuuid/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-partuuid/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" >> ${installdir}/home/partlink.sh
@@ -182,10 +188,8 @@ install_grub(){
 
 install_grub_efi(){
     chrun "pacman -S --noconfirm grub efibootmgr os-prober" "Installing GRUB for UEFI in chroot..."
-
-    echo "Adding Arch ZFS entry to GRUB menu..."
-    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
-        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
+    
+    add_grub_entry
 
     # Write script to create symbolic links for partition ids to work around a GRUB bug that can cause grub-install to fail - hackety hack
     echo -e "ptids=(\`cd /dev/disk/by-id/;ls\`)\nidcount=\${#ptids[@]}\nfor (( c=0; c<\${idcount}; c++ )) do\ndevs[c]=\$(readlink /dev/disk/by-id/\${ptids[\$c]} | sed 's/\.\.\/\.\.\///')\nln -s /dev/\${devs[c]} /dev/\${ptids[c]}\ndone" > ${installdir}/home/partlink.sh
