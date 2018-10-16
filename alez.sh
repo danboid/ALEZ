@@ -386,7 +386,11 @@ else
 fi
 
 echo "Update initial ramdisk (initrd) with ZFS support..."
-chrun "mkinitcpio -p linux"
+if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+	chrun "mkinitcpio -p linux-lts"
+else
+	chrun "mkinitcpio -p linux"
+fi
 
 unmount_cleanup
 echo "Installation complete. You may now reboot into your Arch ZFS install."
