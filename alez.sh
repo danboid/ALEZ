@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Arch Linux Easy ZFS (ALEZ) installer 0.6
+# Arch Linux Easy ZFS (ALEZ) installer 0.66
 # by Dan MacDonald 2016-2018 with contributions from John Ramsden
 
 # Exit on error
@@ -9,7 +9,7 @@ set -o errexit -o errtrace
 # Set a default locale during install to avoid mandb error when indexing man pages
 export LANG=C
 
-version=0.6
+version=0.66
 
 # Colors
 RED='\033[0;31m'
@@ -113,6 +113,10 @@ uefi_partitioning(){
 install_arch(){
     echo "Installing Arch base system..."
     pacstrap ${installdir} base
+    
+    if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+		chrun "pacman -Sy; pacman -S --noconfirm linux-lts" "Installing LTS kernel..."
+	fi
 
     echo "Add fstab entries..."
     fstab_output="$(genfstab -U "${installdir}")"
@@ -131,7 +135,11 @@ install_arch(){
     sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' "${installdir}/etc/mkinitcpio.conf"
 
     chrun "pacman-key -r F75D9D76; pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
-    chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS in chroot..."
+    if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+		chrun "pacman -Sy; pacman -S --noconfirm zfs-linux-lts" "Installing ZFS LTS in chroot..."
+	else
+		chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS stable in chroot..."
+	fi
 
     echo -e "Enable systemd ZFS service...\n"
     chrun "systemctl enable zfs.target"
@@ -230,9 +238,14 @@ fi
 echo -e "\nThe Arch Linux Easy ZFS (ALEZ) installer v${version}\n\n"
 echo -e "Please make sure you are connected to the Internet before running ALEZ.\n\n"
 
-read -p "Install type UEFI [u] or non-UEFI/BIOS? (u/b): " install_type
+read -p "Install type UEFI [u] or non-UEFI/BIOS [b]? (u/b): " install_type
 while ! [[ "${install_type}" =~ ^(u|U|b|B)$ ]]; do
-    read -p "Install type UEFI [u] or non-UEFI/BIOS? (u/b): " install_type
+    read -p "Install type UEFI [u] or non-UEFI/BIOS [b]? (u/b): " install_type
+done
+
+read -p "Kernel type Stable [s] or Longterm [l]? (s/l): " kernel_type
+while ! [[ "${kernel_type}" =~ ^(s|S|l|L)$ ]]; do
+    read -p "Kernel type Stable [s] or Longterm [l]? (s/l): " kernel_type
 done
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
