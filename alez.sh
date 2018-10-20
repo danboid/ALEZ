@@ -19,6 +19,11 @@ installdir="/mnt"
 archzfs_pgp_key="F75D9D76"
 zroot="zroot"
 
+HEIGHT=10
+WIDTH=60
+
+show_partuuid=false
+
 declare -a zpool_bios_features
 zpool_bios_features=(
     'feature@lz4_compress=enabled'
@@ -64,6 +69,7 @@ lsdsks() {
 	done
 }
 
+# Used for displaying partiions
 lsparts() {
     echo -e "\nPartition layout:"
     lsblk
@@ -71,10 +77,8 @@ lsparts() {
     echo -e "If you used this script to create your partitions, choose partitions ending with -part\n\n"
     echo -e "Available partitions:\n\n"
 
-    # Read partitions into an array and print enumerated
-    partids=(
-        $(ls /dev/disk/by-id/* $([ -d /dev/disk/by-partuuid/ ] && ls /dev/disk/by-partuuid/* || : ;))
-    )
+    # Read partitions into an array and print enumerated, only show partuuid if show_partuuid=true
+    partids=($(ls /dev/disk/by-id/* $(${show_partuuid} && ls /dev/disk/by-partuuid/* || : ;)))
     ptcount=${#partids[@]}
 
     for (( p=0; p<${ptcount}; p++ )); do
@@ -83,7 +87,7 @@ lsparts() {
 }
 
 bios_partitioning(){
-    echo "GPT BIOS partitioning ${1}..."
+    echo -e "GPT BIOS partitioning ${1}...\n"
     mdadm --zero-superblock --force "${1}" &> /dev/null
 
     parted --script "${1}" \
@@ -93,26 +97,25 @@ bios_partitioning(){
 }
 
 uefi_partitioning(){
-    echo "GPT UEFI partitioning ${1}..."
-
-    esp_size=512
-    if [[ "${bootloader}" =~ ^(s|S) ]]; then
-        read -p "Enter the size of the esp (in MiB), 1024 or greater reccomended to hold multiple kernels : " esp_size
-        while [ "$esp_size" -lt "512" ]; do
-            read -p "Enter the size of the esp (in MiB), 1024 or greater reccomended to hold multiple kernels : " esp_size
-        done
-    fi
+    echo -e "GPT UEFI partitioning ${1}...\n"
 
     mdadm --zero-superblock --force "${1}" &> /dev/null
     sgdisk --zap-all "${1}"
-    sgdisk --new="1:1M:+${esp_size}M" --typecode=1:EF00 "${1}"
+
+    echo "Creating EFI partition"
+    sgdisk --new="1:1M:+${2}M" --typecode=1:EF00 "${1}"
+
+    echo "Creating solaris partition"
     sgdisk --new=2:0:0 --typecode=2:BF01 "${1}"
 
 }
 
 install_arch(){
     echo "Installing Arch base system..."
+        
     pacstrap ${installdir} base
+
+    chrun "pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
     
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
 		chrun "pacman -Sy; pacman -S --noconfirm linux-lts" "Installing LTS kernel..."
@@ -133,8 +136,7 @@ install_arch(){
 
     echo "Modify HOOKS in mkinitcpio.conf..."
     sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' "${installdir}/etc/mkinitcpio.conf"
-
-    chrun "pacman-key -r F75D9D76; pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
+    
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
 		chrun "pacman -Sy; pacman -S --noconfirm zfs-linux-lts" "Installing ZFS LTS in chroot..."
 	else
@@ -158,35 +160,18 @@ add_grub_entry(){
 
 grub_hacks(){
     gen_partlink "/dev/disk/by-id/" > "${installdir}/home/partlink.sh"
-    gen_partlink "/dev/disk/by-partuuid/" >> "${installdir}/home/partlink.sh"
+    "${show_partuuid}" && gen_partlink "/dev/disk/by-partuuid/" >> "${installdir}/home/partlink.sh" || :
 
     echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
     chrun "sh /home/partlink.sh > /dev/null 2>&1"
     rm -f ${installdir}/home/partlink.sh
-}
-	
+}	
 
 install_grub(){
-    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..."
-
     add_grub_entry
-    
     grub_hacks
-
     lsdsks
-
-    # Install GRUB BIOS
-    echo -e "NOTE: If you have installed Arch onto a mirrored pool then you should install GRUB onto both disks\n"
-    read -p "Do you want to install GRUB onto any of the attached disks? (N/y): " dogrub
-    while [ "$dogrub" == "y" ] || [ "$dogrub" == "Y" ]; do
-        read -p "Enter the number of the disk to install GRUB to : " gn
-        if [ "$gn" -ge 0 -a "$gn" -le "$ndisks" ]; then
-                chrun "grub-install /dev/${disks[$gn]}" "Installing GRUB to /dev/${disks[$gn]}..."
-        else
-                echo "Please enter a number between 0 and $(($ndisks-1))"
-        fi
-        read -p "Do you want to install GRUB to another disk? (N/y) : " dogrub
-    done
+    chrun "grub-install /dev/${disks[$gn]}" "Installing GRUB to /dev/${disks[$gn]}..."
 }
 
 gen_partlink(){
@@ -204,31 +189,30 @@ install_grub_efi(){
     chrun "pacman -S --noconfirm grub efibootmgr os-prober" "Installing GRUB for UEFI in chroot..."
 
     add_grub_entry
-
     grub_hacks
 
     # Install GRUB EFI
     chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" "Installing grub-efi to ${1}"
 }
 
+gen_sdboot_entry(){
+    cat <<- EOF > "${installdir}/${1}/loader/entries/zedenv-default.conf"
+        title           [default] (Arch Linux)
+        linux           /env/zedenv-default/vmlinuz-${2}
+        initrd          /env/zedenv-default/initramfs-${2}.img
+        options         zfs=${zroot}/ROOT/default rw
+EOF
+}
+
 install_sdboot(){
     chrun "bootctl --path=${1} install" "Installing systemd-boot to ${1}"
     mkdir -p "${installdir}/${1}/loader/entries"
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-    cat <<- EOF > "${installdir}/${1}/loader/entries/zedenv-default.conf"
-        title           [default] (Arch Linux)
-        linux           /env/zedenv-default/vmlinuz-linux-lts
-        initrd          /env/zedenv-default/initramfs-linux-lts.img
-        options         zfs=${zroot}/ROOT/default rw
-EOF
+        gen_sdboot_entry "${1}" "linux-lts"
 	else
-    cat <<- EOF > "${installdir}/${1}/loader/entries/zedenv-default.conf"
-        title           [default] (Arch Linux)
-        linux           /env/zedenv-default/vmlinuz-linux
-        initrd          /env/zedenv-default/initramfs-linux.img
-        options         zfs=${zroot}/ROOT/default rw
-EOF
-fi
+        gen_sdboot_entry "${1}" "linux"
+    fi
+
     cat <<- EOF > "${installdir}/${1}/loader/loader.conf"
        timeout 3
        default zedenv-default
@@ -237,16 +221,34 @@ EOF
 
 check_mountdir(){
     if [ "$(ls -A ${installdir})" ]; then
-    echo "Install directory ${installdir} isn't empty"
-    tempdir="$(mktemp -d)"
-    if [ -d "${tempdir}" ]; then
-        echo "Using temp directory ${tempdir}"
-        installdir="${tempdir}"
-    else
-        echo "Exiting, error occurred"
-        exit 1
+        echo "Install directory ${installdir} isn't empty"
+        tempdir="$(mktemp -d)"
+        if [ -d "${tempdir}" ]; then
+            echo "Using temp directory ${tempdir}"
+            installdir="${tempdir}"
+        else
+            echo "Exiting, error occurred"
+            exit 1
+        fi
     fi
-fi
+}
+
+get_disks(){
+    disks=($(lsblk | grep disk | awk '{print $1}'))
+	ndisks=${#disks[@]}
+	for (( d=0; d<${ndisks}; d++ )); do
+	   echo "$d"; echo "${disks[d]}"
+	done
+}
+
+get_parts() {
+    # Read partitions into an array and print enumerated
+    partids=($(ls /dev/disk/by-id/* $("${show_partuuid}" && ls /dev/disk/by-partuuid/* || : ;)))
+    ptcount=${#partids[@]}
+
+    for (( p=0; p<${ptcount}; p++ )); do
+        echo "$p" "${partids[p]}"
+    done
 }
 
 ## MAIN ##
@@ -260,24 +262,18 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-echo -e "\nThe Arch Linux Easy ZFS (ALEZ) installer v${version}\n\n"
-echo -e "Please make sure you are connected to the Internet before running ALEZ.\n\n"
+dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
+       --msgbox "Please make sure you are connected to the Internet before running ALEZ." ${HEIGHT} ${WIDTH}
 
-read -p "Install type UEFI [u] or non-UEFI/BIOS [b]? (u/b): " install_type
-while ! [[ "${install_type}" =~ ^(u|U|b|B)$ ]]; do
-    read -p "Install type UEFI [u] or non-UEFI/BIOS [b]? (u/b): " install_type
-done
+install_type=$(dialog --stdout --clear --title "Install type" \
+                      --menu "Please select:" $HEIGHT $WIDTH 4 "u" "UEFI" "b" "BIOS")
 
-read -p "Kernel type Stable [s] or Longterm [l]? (s/l): " kernel_type
-while ! [[ "${kernel_type}" =~ ^(s|S|l|L)$ ]]; do
-    read -p "Kernel type Stable [s] or Longterm [l]? (s/l): " kernel_type
-done
+kernel_type=$(dialog --stdout --clear --title "Kernel type" \
+                     --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable" "l" "Longterm")
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
-    read -p "UEFI bootloader systemd-boot [s] or GRUB on ZFS [g]? (s/g): " bootloader
-    while ! [[ "${bootloader}" =~ ^(s|S|g|G)$ ]]; do
-        read -p "UEFI bootloader systemd-boot [s] or GRUB on ZFS [g]? (s/g): " bootloader
-    done
+    bootloader=$(dialog --stdout --clear --title "UEFI bootloader" \
+                        --menu "Please select:" $HEIGHT $WIDTH 4 "s" "systemd-boot" "g" "GRUB on ZFS")
 
     if [[ "${bootloader}" =~ ^(s|S)$ ]]; then
         esp_mountpoint="/mnt/efi"
@@ -289,50 +285,84 @@ else
     bootloader="g"
 fi
 
+# check if vd* disk exists
+if lsblk | grep -E 'vd.*disk'; then
+    [ -d /dev/disk/by-partuuid/ ] && show_partuuid=true
+fi
+
 # No frills GPT partitioning
-read -p "Do you want to select a drive to be auto-partitioned? (N/y): " dopart
-while [[ "$dopart" =~ ^(y|Y)$ ]]; do
-    lsdsks
-    blkdev=-1
-    while [ "$blkdev" -ge "$ndisks" ] || [ "$blkdev" -lt 0 ]; do
-        read -p "Enter the number of the disk you want to partition, between 0 and $(($ndisks-1)) : " blkdev
-    done
+autopart="Do you want to select a drive to be auto-partitioned?"
+declare -a aflags=(--clear --title 'Partitioning' --yesno)
+while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
 
-    read -p "ALL data on /dev/${disks[$blkdev]} will be lost? Proceed? (N/y) : " blkconf
-    if [[ "${blkconf}" =~ ^(y|Y)$ ]]; then
+    if dialog --clear --title "Disk layout" --yesno "View disk layout before choosing zpool partitions?" $HEIGHT $WIDTH; then
+        file="$(mktemp)"
+        lsdsks > "${file}"
+        dialog --tailbox ${file} 0 0
+    fi
 
-        read -p "Shred partitions before partitioning /dev/${disks[$blkdev]} (slow)? (N/y) : " shreddisk
-        if [[ "${shreddisk}" =~ ^(y|Y)$ ]]; then
-            shred --verbose -n1 "/dev/${disks[$blkdev]}"
+    diskinfo="$(get_disks)"
+    dlength="$(echo "${diskinfo}" | wc -l)"
+    blkdev=$(dialog --stdout --clear --title "Install type" \
+                    --menu "Select a disk" $HEIGHT $WIDTH "${dlength}" ${diskinfo})
+
+    msg="ALL data on /dev/${disks[$blkdev]} will be lost? Proceed?"
+    if dialog --clear --title "Partition disk?" --yesno "${msg}" $HEIGHT $WIDTH; then
+        msg="Shred partitions before partitioning /dev/${disks[$blkdev]} (slow)?"
+        if dialog --clear --title "Shred disk?" --defaultno --yesno "${msg}" $HEIGHT $WIDTH; then
+            dialog --prgbox "shred --verbose -n1 /dev/${disks[$blkdev]}" 10 70
         fi
 
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
-            bios_partitioning "/dev/${disks[$blkdev]}"
+            bios_partitioning "/dev/${disks[$blkdev]}" | dialog --programbox 10 70
         else
-            uefi_partitioning "/dev/${disks[$blkdev]}"
+            esp_size=512
+            if [[ "${bootloader}" =~ ^(s|S) ]]; then
+                msg="Enter the size of the esp (512 or greater in MiB),\n1024 or greater reccomended to hold multiple kernels"
+                esp_size=$(dialog --stdout --clear --title "UEFI partition size" --inputbox "${msg}" $HEIGHT $WIDTH "2048")
+                while [ "$esp_size" -lt "512" ]; do
+                    esp_size=$(dialog --stdout --clear --title "UEFI partition size" --inputbox "${msg}" $HEIGHT $WIDTH "2048")
+                done
+            fi
+            uefi_partitioning "/dev/${disks[$blkdev]}" "${esp_size}" | dialog --programbox 10 70
         fi
-    else
-        break
     fi
-    read -p "Do you want to partition another device? (N/y) : " dopart
+    autopart="Do you want to select another drive to be auto-partitioned?"
+    declare -a aflags=(--clear --title 'Partitioning' --defaultno --yesno)
 done
 
 # Create zpool
-zpconf="0"
-while read -p "Do you want to create a single or double disk (mirrored) zpool? (1/2) : " zpconf ; do 
-    lsparts
-    if [ "$zpconf" == "1" ]; then 
-        read -p "Enter the number of the partition above that you want to create a new zpool on : " zps
-        echo "Creating a single disk zpool..."
+msg="Do you want to create a new zpool?"
+while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
+    zpconf=$(dialog --stdout --clear --title "Install type" \
+                    --menu "Single disc, or mirrorred zpool?" $HEIGHT $WIDTH 4 "s" "Single disc" "m" "Mirrored")
+    
+    if dialog --clear --title "Disk layout" --yesno "View partition layout?" $HEIGHT $WIDTH; then
+        partsfile="$(mktemp)"
+        lsparts > "${partsfile}"
+        dialog --tailbox ${partsfile} 0 0
+    fi
+
+    partinfo="$(get_parts)"
+    plength="$(echo "${partinfo}" | wc -l)"
+
+    if [ "$zpconf" == "s" ]; then 
+        msg="Select a partition.\n\nIf you used this script to create your partitions,\nchoose partitions ending with -part"
+        zps=$(dialog --stdout --clear --title "Choose partition" \
+                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
         else
             zpool create -f -d -m none -o ashift=12 "${zroot}" "${partids[$zps]}"
         fi
+        dialog --title "Success" --msgbox "Created a single disk zpool with ${partids[$zps]}...." ${HEIGHT} ${WIDTH}
         break
-    elif [ "$zpconf" == "2" ]; then
-        read -p "Enter the number of the first partition : " zp1
-        read -p "Enter the number of the second partition : " zp2
+    elif [ "$zpconf" == "m" ]; then
+        zp1=$(dialog --stdout --clear --title "First zpool partition" \
+                     --radiolist "Select the number of the first partition" $HEIGHT $WIDTH "${plength}" ${partinfo})
+        zp2=$(dialog --stdout --clear --title "Second zpool partition" \
+                     --radiolist "Select the number of the second partition" $HEIGHT $WIDTH "${plength}" ${partinfo})
+    
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             zpool create "${zroot}" mirror -f -d -m none \
@@ -341,51 +371,65 @@ while read -p "Do you want to create a single or double disk (mirrored) zpool? (
         else
             zpool create "${zroot}" mirror -f -d -m none -o ashift=12 "${partids[$zp1]}" "${partids[$zp2]}"
         fi
+        dialog --title "Success" --msgbox "Created a mirrored zpool with ${partids[$zp1]} ${partids[$zp2]}...." ${HEIGHT} ${WIDTH}
         break
     fi
-    echo "Please enter 1 or 2"
 done 
 
-echo "Creating datasets..."
-zfs create -o mountpoint=none "${zroot}"/ROOT
-zfs create -o mountpoint=none "${zroot}"/data
-zfs create -o mountpoint=legacy "${zroot}"/data/home
+{
+    echo "Creating datasets..."
+    zfs create -o mountpoint=none "${zroot}"/ROOT
+    zfs create -o mountpoint=none "${zroot}"/data
+    zfs create -o mountpoint=legacy "${zroot}"/data/home
 
-{ zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
+    { zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
 
-# GRUB only datasets
-if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
-    zfs create -o canmount=off "${zroot}"/boot
-    zfs create -o mountpoint=legacy "${zroot}"/boot/grub
-fi
+    # GRUB only datasets
+    if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
+        zfs create -o canmount=off "${zroot}"/boot
+        zfs create -o mountpoint=legacy "${zroot}"/boot/grub
+    fi
 
-# This umount is not always required but can prevent problems with the next command
-zfs umount -a
+    # This umount is not always required but can prevent problems with the next command
+    zfs umount -a
 
-echo "Setting ZFS properties..."
-zfs set atime=off "${zroot}"
-zfs set compression=on "${zroot}"
-zpool set bootfs="${zroot}"/ROOT/default "${zroot}"
+    echo "Setting ZFS properties..."
+    zfs set atime=off "${zroot}"
+    zfs set compression=on "${zroot}"
+    zpool set bootfs="${zroot}"/ROOT/default "${zroot}"
 
-check_mountdir
+    check_mountdir
 
-echo "Exporting and importing pool..."
-zpool export "${zroot}"
-zpool import "$(zpool import | grep id: | awk '{print $2}')" -R "${installdir}" "${zroot}"
+    echo "Exporting and importing pool..."
+    zpool export "${zroot}"
+    zpool import "$(zpool import | grep id: | awk '{print $2}')" -R "${installdir}" "${zroot}"
 
-mkdir -p "${installdir}/home"
-mount -t zfs "${zroot}/data/home" "${installdir}/home"
+    mkdir -p "${installdir}/home"
+    mount -t zfs "${zroot}/data/home" "${installdir}/home"
 
-if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
-    mkdir -p "${installdir}/boot/grub"
-    mount -t zfs "${zroot}/boot/grub" "${installdir}/boot/grub"
-fi
+    if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
+        mkdir -p "${installdir}/boot/grub"
+        mount -t zfs "${zroot}/boot/grub" "${installdir}/boot/grub"
+    fi
+} | dialog --progressbox 10 70
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
-    lsparts
-    read -p "Enter the number of the partition above that you want to use for an esp : " esp
+    
+    if dialog --clear --title "Disk layout" --yesno "View partition layout before creating esp?" $HEIGHT $WIDTH; then
+        partsfile="$(mktemp)"
+        lsparts > "${partsfile}"
+        dialog --tailbox ${partsfile} 0 0
+    fi
+
+    partinfo="$(get_parts)"
+    plength="$(echo "${partinfo}" | wc -l)"
+
+    esp=$(dialog --stdout --clear --title "Install type" \
+                 --menu "Enter the number of the partition above that you want to use for an esp" \
+                 $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+
     efi_partition="${partids[$esp]}"
-    mkfs.fat -F 32 "${efi_partition}"
+    mkfs.fat -F 32 "${efi_partition}"| dialog --progressbox 10 70
 
     mkdir -p "${installdir}${esp_mountpoint}" "${installdir}/boot"
     mount "${efi_partition}" "${installdir}${esp_mountpoint}"
@@ -396,26 +440,60 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     fi
 fi
 
+dialog --title "Begin install?" --msgbox "Setup complete, begin install?" ${HEIGHT} ${WIDTH}
+
 { pacman-key -r "${archzfs_pgp_key}" && pacman-key --lsign-key "${archzfs_pgp_key}" ; } &> /dev/null
 
-install_arch
+install_arch | dialog --progressbox 30 70
 
+# Install GRUB BIOS
 if [[ "${install_type}" =~ ^(b|B)$ ]]; then
-    install_grub
+
+    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." | dialog --progressbox 30 70
+
+    autopart="Do you want to install GRUB onto any of the attached disks?"
+    declare -a aflags=(--clear --title 'Install GRUB' --yesno)
+    while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
+            
+        msg="NOTE: If you have installed Arch onto a mirrored pool then you should install GRUB onto both disks\n"
+        dialog --title "Install GRUB" --msgbox "${msg}" ${HEIGHT} ${WIDTH}
+
+        if dialog --clear --title "Disk layout" --yesno "View partition layout before GRUB install?" $HEIGHT $WIDTH; then
+            partsfile="$(mktemp)"
+            lsparts > "${partsfile}"
+            dialog --tailbox ${partsfile} 0 0
+        fi
+
+        partinfo="$(get_parts)"
+        plength="$(echo "${partinfo}" | wc -l)"
+
+        grubdisk=$(dialog --stdout --clear --title "Install type" \
+                 --menu "Enter the number of the partition above that you want to install to" \
+                 $HEIGHT $WIDTH "${plength}" ${partinfo})
+
+        install_grub "/dev/${disks[${grubdisk}]}" | dialog --progressbox 30 70
+
+        autopart="Do you want to select another drive to install GRUB onto?"
+        declare -a aflags=(--clear --title 'Install GRUB' --defaultno --yesno)
+    done
 else
-    if [[ "${bootloader}" =~ ^(s|S)$ ]]; then
-        install_sdboot "${esp_mountpoint}"
-    else
-        install_grub_efi "${esp_mountpoint}"
-    fi
+    {
+        if [[ "${bootloader}" =~ ^(s|S)$ ]]; then
+            install_sdboot "${esp_mountpoint}"
+        else
+            install_grub_efi "${esp_mountpoint}"
+        fi
+    }  | dialog --progressbox 30 70
 fi
 
-echo "Update initial ramdisk (initrd) with ZFS support..."
-if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-	chrun "mkinitcpio -p linux-lts"
-else
-	chrun "mkinitcpio -p linux"
-fi
+{
+    echo "Update initial ramdisk (initrd) with ZFS support..."
+    if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+        chrun "mkinitcpio -p linux-lts"
+    else
+        chrun "mkinitcpio -p linux"
+    fi
+} | dialog --progressbox 30 70
 
 unmount_cleanup
-echo "Installation complete. You may now reboot into your Arch ZFS install."
+echo "Installation complete. You may now reboot into your Arch ZFS install." | dialog --programbox 10 70
