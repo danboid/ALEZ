@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Arch Linux Easy ZFS (ALEZ) installer 0.66
+# Arch Linux Easy ZFS (ALEZ) installer 0.666
 # by Dan MacDonald 2016-2018 with contributions from John Ramsden
 
 # Exit on error
@@ -9,7 +9,7 @@ set -o errexit -o errtrace
 # Set a default locale during install to avoid mandb error when indexing man pages
 export LANG=C
 
-version=0.66
+version=0.666
 
 # Colors
 RED='\033[0;31m'
