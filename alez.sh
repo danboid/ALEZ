@@ -396,6 +396,7 @@ done
     echo "Setting ZFS properties..."
     zfs set atime=off "${zroot}"
     zfs set compression=on "${zroot}"
+    zfs set acltype=posixacl "${zroot}"
     zpool set bootfs="${zroot}"/ROOT/default "${zroot}"
 
     check_mountdir
