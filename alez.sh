@@ -19,8 +19,8 @@ installdir="/mnt"
 archzfs_pgp_key="F75D9D76"
 zroot="zroot"
 
-HEIGHT=10
-WIDTH=60
+HEIGHT=0
+WIDTH=0
 
 show_partuuid=false
 
@@ -112,11 +112,11 @@ uefi_partitioning(){
 
 install_arch(){
     echo "Installing Arch base system..."
-        
+
     pacstrap ${installdir} base
 
     chrun "pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
-    
+
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
 		chrun "pacman -Sy; pacman -S --noconfirm linux-lts" "Installing LTS kernel..."
 	fi
@@ -136,7 +136,7 @@ install_arch(){
 
     echo "Modify HOOKS in mkinitcpio.conf..."
     sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' "${installdir}/etc/mkinitcpio.conf"
-    
+
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
 		chrun "pacman -Sy; pacman -S --noconfirm zfs-linux-lts" "Installing ZFS LTS in chroot..."
 	else
@@ -165,7 +165,7 @@ grub_hacks(){
     echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
     chrun "sh /home/partlink.sh > /dev/null 2>&1"
     rm -f ${installdir}/home/partlink.sh
-}	
+}
 
 install_grub(){
     add_grub_entry
@@ -336,7 +336,7 @@ msg="Do you want to create a new zpool?"
 while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     zpconf=$(dialog --stdout --clear --title "Install type" \
                     --menu "Single disc, or mirrorred zpool?" $HEIGHT $WIDTH 4 "s" "Single disc" "m" "Mirrored")
-    
+
     if dialog --clear --title "Disk layout" --yesno "View partition layout?" $HEIGHT $WIDTH; then
         partsfile="$(mktemp)"
         lsparts > "${partsfile}"
@@ -346,7 +346,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
 
-    if [ "$zpconf" == "s" ]; then 
+    if [ "$zpconf" == "s" ]; then
         msg="Select a partition.\n\nIf you used this script to create your partitions,\nchoose partitions ending with -part"
         zps=$(dialog --stdout --clear --title "Choose partition" \
                      --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
@@ -362,7 +362,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
                      --radiolist "Select the number of the first partition" $HEIGHT $WIDTH "${plength}" ${partinfo})
         zp2=$(dialog --stdout --clear --title "Second zpool partition" \
                      --radiolist "Select the number of the second partition" $HEIGHT $WIDTH "${plength}" ${partinfo})
-    
+
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             zpool create "${zroot}" mirror -f -d -m none \
@@ -374,7 +374,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         dialog --title "Success" --msgbox "Created a mirrored zpool with ${partids[$zp1]} ${partids[$zp2]}...." ${HEIGHT} ${WIDTH}
         break
     fi
-done 
+done
 
 {
     echo "Creating datasets..."
@@ -415,7 +415,7 @@ done
 } | dialog --progressbox 10 70
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
-    
+
     if dialog --clear --title "Disk layout" --yesno "View partition layout before creating esp?" $HEIGHT $WIDTH; then
         partsfile="$(mktemp)"
         lsparts > "${partsfile}"
@@ -455,7 +455,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
     autopart="Do you want to install GRUB onto any of the attached disks?"
     declare -a aflags=(--clear --title 'Install GRUB' --yesno)
     while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
-            
+
         msg="NOTE: If you have installed Arch onto a mirrored pool then you should install GRUB onto both disks\n"
         dialog --title "Install GRUB" --msgbox "${msg}" ${HEIGHT} ${WIDTH}
 
