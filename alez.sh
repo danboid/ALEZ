@@ -77,7 +77,7 @@ lsparts() {
     echo -e "\nPartition layout:"
     lsblk
 
-    echo -e "If you used this script to create your partitions, choose partitions ending with -part\n\n"
+    echo -e "If you used alez to create your partitions, you likely want the one ending with -part2\n\n"
     echo -e "Available partitions:\n\n"
 
     # Read partitions into an array and print enumerated, only show partuuid if show_partuuid=true
@@ -478,4 +478,4 @@ fi
 } | dialog --progressbox 30 70
 
 unmount_cleanup
-echo "Installation complete. You may now reboot into your Arch ZFS install." | dialog --programbox 10 70
+echo "Installation complete. You may now reboot into your new install." | dialog --programbox 10 70
