@@ -136,6 +136,9 @@ install_arch(){
 
     echo "Add Arch ZFS pacman repo..."
     echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> "${installdir}/etc/pacman.conf"
+    
+    echo -e "Export ZPOOL_VDEV_NAME_PATH\n"
+    echo -e "\nexport ZPOOL_VDEV_NAME_PATH=1" >> "${installdir}/etc/profile"
 
     echo "Modify HOOKS in mkinitcpio.conf..."
     sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' "${installdir}/etc/mkinitcpio.conf"
