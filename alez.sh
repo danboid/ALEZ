@@ -328,7 +328,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     plength="$(echo "${partinfo}" | wc -l)"
 
     if [ "$zpconf" == "s" ]; then
-        msg="Select a partition.\n\nIf you used this script to create your partitions,\nchoose partitions ending with -part"
+        msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
         zps=$(dialog --stdout --clear --title "Choose partition" \
                      --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
@@ -478,4 +478,4 @@ fi
 } | dialog --progressbox 30 70
 
 unmount_cleanup
-echo "Installation complete. You may now reboot into your new install." | dialog --programbox 10 70
+echo "Installation complete. You may now reboot into your new install.   " | dialog --programbox 10 70
