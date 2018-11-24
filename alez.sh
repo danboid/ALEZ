@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Arch Linux Easy ZFS (ALEZ) installer 0.666
+# Arch Linux Easy ZFS (ALEZ) installer 0.7
 # by Dan MacDonald 2016-2018 with contributions from John Ramsden
 
 # Exit on error
@@ -9,7 +9,10 @@ set -o errexit -o errtrace
 # Set a default locale during install to avoid mandb error when indexing man pages
 export LANG=C
 
-version=0.666
+# This is required to fix grub's "failed to get canonical path" error
+export ZPOOL_VDEV_NAME_PATH=1
+
+version=0.7
 
 # Colors
 RED='\033[0;31m'
@@ -158,38 +161,16 @@ add_grub_entry(){
 	fi
 }
 
-grub_hacks(){
-    gen_partlink "/dev/disk/by-id/" > "${installdir}/home/partlink.sh"
-    "${show_partuuid}" && gen_partlink "/dev/disk/by-partuuid/" >> "${installdir}/home/partlink.sh" || :
-
-    echo -e "Create symbolic links for partition ids to work around a grub-install bug...\n"
-    chrun "sh /home/partlink.sh > /dev/null 2>&1"
-    rm -f ${installdir}/home/partlink.sh
-}
-
 install_grub(){
     add_grub_entry
-    grub_hacks
     lsdsks
     chrun "grub-install /dev/${disks[$gn]}" "Installing GRUB to /dev/${disks[$gn]}..."
-}
-
-gen_partlink(){
-    cat <<- EOF
-        ptids=(\$(cd ${1} && ls));
-        nidcount=\${#ptids[@]};
-        for (( c=0; c<\${nidcount}; c++ )); do
-            devs[c]=\$(readlink ${1}\${ptids[\$c]} | sed 's/\.\.\/\.\.\///');
-            ln -s /dev/\${devs[c]} /dev/\${ptids[c]};
-        done;
-EOF
 }
 
 install_grub_efi(){
     chrun "pacman -S --noconfirm grub efibootmgr os-prober" "Installing GRUB for UEFI in chroot..."
 
     add_grub_entry
-    grub_hacks
 
     # Install GRUB EFI
     chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" "Installing grub-efi to ${1}"
