@@ -89,10 +89,15 @@ lsparts() {
     done
 }
 
+zap_partition(){
+    vgchange -an &> /dev/null
+    mdadm --zero-superblock --force "${1}" &> /dev/null
+    sgdisk --zap-all "${1}" &> /dev/null
+}
+
 bios_partitioning(){
     echo -e "GPT BIOS partitioning ${1}...\n"
-    mdadm --zero-superblock --force "${1}" &> /dev/null
-
+    zap_partition "${1}"
     parted --script "${1}" \
         mklabel gpt \
         mkpart non-fs 0% 2 \
@@ -101,9 +106,7 @@ bios_partitioning(){
 
 uefi_partitioning(){
     echo -e "GPT UEFI partitioning ${1}...\n"
-
-    mdadm --zero-superblock --force "${1}" &> /dev/null
-    sgdisk --zap-all "${1}"
+    zap_partition "${1}"
 
     echo "Creating EFI partition"
     sgdisk --new="1:1M:+${2}M" --typecode=1:EF00 "${1}"
