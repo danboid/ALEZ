@@ -51,3 +51,9 @@ The following package cannot be upgraded due to unresolvable dependecies: zfs-li
 ```
 
 When this happens you have two easy options. Either wait 24 hours for the Arch ZFS repo to update its packages to be in sync with the new Arch stable kernel package or install the LTS kernel.
+
+
+archzfs key import fails
+------------------------
+
+If ALEZ abruptly 'completes' near the start of the install, it could be that it failed to import the key for the archzfs repo because the archlinux-keyring PGP signatures package included on the iso is outdated. Rather than waiting for a new ISO to be uploaded you can follow the instructions in create-alez-iso.txt to create an updated ISO.
