@@ -1,0 +1,60 @@
+Creating an updated ALEZ install ISO
+
+Sometimes ALEZ will fail to install because the archlinux-keyring package included 
+on the ISO is outdated causing PGP verification of the Arch ZFS repo to fail. If 
+that is the case, you may need to create an updated ISO complete with the ZFS packages, 
+git and the ALEZ downloader. 
+
+Here are the steps to manually create an updated ALEZ install ISO:
+
+* Boot into an up-to-date install of Arch (but not under LXD/LXC as the build script 
+doesn't work in a container) and run the following to install the Arch ISO build 
+scripts and their dependencies (and git):
+
+# pacman -S archiso git
+
+* Now copy the releng profile directory:
+
+# cp -r /usr/share/archiso/configs/releng ~/aleziso
+
+* Edit ~/aleziso/packages.x86_64 and add the following lines:
+
+git
+archzfs-linux
+
+* Edit ~/aleziso/pacman.conf and add the following lines:
+
+[archzfs]
+Server = http://archzfs.com/$repo/x86_64
+
+* Import and sign the archzfs repo key:
+
+# pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76
+
+(NB You may want to check the key hasn't changed first by checking 
+https://wiki.archlinux.org/index.php/Unofficial_user_repositories#archzfs )
+
+* Clone the ALEZ repo
+
+git clone https://github.com/danboid/ALEZ.git
+
+* Make airootfs directory for alez downloader:
+
+# mkdir -p ~/aleziso/airootfs/usr/local/bin
+
+* Copy scripts into airootfs tree:
+
+# cd ~/ALEZ/
+# cp alez-downloader.sh ~/aleziso/airootfs/usr/local/bin/alez
+# cp motd ~/aleziso/airootfs/etc/
+
+* Make alez downloader executable:
+
+# chmod +x ~/aleziso/airootfs/usr/local/bin/alez
+
+* Build the ISO:
+
+# cd ~/aleziso
+# ./build.sh -v
+
+When the build process is complete, your ISO will be under ~/aleziso/out
