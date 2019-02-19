@@ -168,8 +168,6 @@ add_grub_entry(){
 }
 
 install_grub(){
-    add_grub_entry
-    lsdsks
     chrun "grub-install /dev/${disks[$gn]}" "Installing GRUB to /dev/${disks[$gn]}..."
 }
 
@@ -438,6 +436,8 @@ install_arch | dialog --progressbox 30 70
 if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
     chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." | dialog --progressbox 30 70
+    chrun "grub-mkconfig -o /boot/grub/grub.cfg" "Create GRUB configuration"
+    add_grub_entry
 
     autopart="Do you want to install GRUB onto any of the attached disks?"
     declare -a aflags=(--clear --title 'Install GRUB' --yesno)
@@ -452,7 +452,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             dialog --tailbox ${partsfile} 0 0
         fi
 
-        partinfo="$(get_parts)"
+        partinfo="$(get_disks)"
         plength="$(echo "${partinfo}" | wc -l)"
 
         grubdisk=$(dialog --stdout --clear --title "Install type" \
