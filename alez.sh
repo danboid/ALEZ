@@ -157,6 +157,7 @@ install_arch(){
 }
 
 add_grub_entry(){
+	chrun "grub-mkconfig -o /boot/grub/grub.cfg" "Create GRUB configuration"
     echo "Adding Arch ZFS entry to GRUB menu..."
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
     awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux-lts \
@@ -436,7 +437,7 @@ install_arch | dialog --progressbox 30 70
 if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
     chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." | dialog --progressbox 30 70
-    chrun "grub-mkconfig -o /boot/grub/grub.cfg" "Create GRUB configuration"
+    
     add_grub_entry
 
     autopart="Do you want to install GRUB onto any of the attached disks?"
