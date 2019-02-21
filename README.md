@@ -30,15 +30,8 @@ ALEZ has a few limitations you need to be aware of:
 HOW DO I USE IT?
 ----------------
 
-The official Arch installation images don't support ZFS. The easiest way to use ALEZ is to [download archlinux-alez.](https://github.com/danboid/ALEZ/releases) which a version of Arch Linux remastered to include ZFS support and the Arch Linux Easy ZFS (ALEZ) installer.
+The easiest way to use ALEZ is to [download archlinux-alez.](https://github.com/danboid/ALEZ/releases), which is a version of Arch Linux remastered to include ZFS support and the Arch Linux Easy ZFS (ALEZ) installer. [Transfer the iso onto a USB drive](https://wiki.archlinux.org/index.php/USB_flash_installation_media) (or burn it to a disc) just as you would for the regular Arch iso, boot it and then type 'alez' at the prompt to start the installer.
 
-Otherwise, you need to manually add the Arch ZFS repo and install the ZFS package when booting off the Arch install image BEFORE running the script OR you can create your own custom Arch install CD that includes the required ZFS packages. You must install either zfs-linux, zfs-linux-lts or zfs-linux-git (but only one of those) before you can run this script. ALEZ installs zfs-linux into the new system by default.
-
-See [this link for instructions on creating a custom Arch installer with ZFS support](https://wiki.archlinux.org/index.php/ZFS#Embed_the_archzfs_packages_into_an_archiso)
-
-Otherwise, add [this repo to your /etc/pacman.conf](https://wiki.archlinux.org/index.php/Unofficial_user_repositories#archzfs)
-
-Apart from having one of those three ZFS packages installed, ALEZ must be run as root plus you need a working internet connection so that it can download the required packages. Once you have booted an Arch install disc, you have a suitable ZFS package installed and you have copied the script onto your system (all this is done for you with archlinux-alez) simply run `alez` from any location and answer the simple questions it prompts you for.
 
 
 Stable vs LTS kernel
@@ -53,7 +46,18 @@ The following package cannot be upgraded due to unresolvable dependecies: zfs-li
 When this happens you have two easy options. Either wait 24 hours for the Arch ZFS repo to update its packages to be in sync with the new Arch stable kernel package or install the LTS kernel.
 
 
+
+TROUBLESHOOTING
+---------------
+
+
 archzfs key import fails
 ------------------------
 
 If ALEZ abruptly 'completes' near the start of the install, it could be that it failed to import the key for the archzfs repo because the archlinux-keyring PGP signatures package included on the iso is outdated. Rather than waiting for a new ISO to be uploaded you can follow the instructions in create-alez-iso.txt to create an updated ISO.
+
+
+Installing under virt-manager 1.x / qemu
+----------------------------------------
+
+GRUB fails to install under VMs created using the virt-manager 1.x defaults. If you wish to run ALEZ under virt-manager 1.x or qemu, modify the VMs CPU settings to enable 'Copy host CPU configuration' mode.
