@@ -12,7 +12,7 @@ export LANG=C
 # This is required to fix grub's "failed to get canonical path" error
 export ZPOOL_VDEV_NAME_PATH=1
 
-version=0.7
+version=0.8
 
 # Colors
 RED='\033[0;31m'
@@ -118,14 +118,14 @@ uefi_partitioning(){
 
 install_arch(){
     echo "Installing Arch base system..."
-
-    pacstrap ${installdir} base
+	
+	if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+		pacman -Sg base | cut -d ' ' -f 2 | sed s/\^linux\$/linux-lts/g | pacstrap ${installdir} -
+	else
+		pacstrap ${installdir} base
+	fi
 
     chrun "pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
-
-    if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-		chrun "pacman -Sy; pacman -S --noconfirm linux-lts" "Installing LTS kernel..."
-	fi
 
     echo "Add fstab entries..."
     fstab_output="$(genfstab -U "${installdir}")"
