@@ -9,7 +9,6 @@ RUN mkdir -p /opt/alez && \
     cp -r /usr/share/archiso/configs/releng /opt/alez/iso
 
 # RUN printf 'git\nzfs-linux\n' > /opt/alez/iso/packages.x86_64
-
 # Add archzfs before [core]
 RUN sed -i '/^\[core\]/i [archzfs]\nServer = http://archzfs.com/$repo/x86_64\n'  \
     /opt/alez/iso/pacman.conf
