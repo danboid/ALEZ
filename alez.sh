@@ -52,7 +52,7 @@ unmount_cleanup() {
 }
 
 error_cleanup() {
-    echo -e "${RED}WARNING:${NC} Error occurred. Unmounted datasets and exported ${zpool}"
+    echo -e "${RED}WARNING:${NC} Error occurred. Unmounted datasets and exported ${zroot}"
     # Other cleanup
 }
 
