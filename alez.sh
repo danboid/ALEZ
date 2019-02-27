@@ -122,7 +122,7 @@ install_arch(){
     echo "Installing Arch base system..."
 	
 	if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-		pacman -Sg base | cut -d ' ' -f 2 | sed s/\^linux\$/linux-lts/g | pacstrap ${installdir} -
+		pacman -Sg base | cut -d ' ' -f 2 | sed 's/^linux$/linux-lts/g' | pacstrap ${installdir} -
 	else
 		pacstrap ${installdir} base
 	fi
@@ -133,7 +133,7 @@ install_arch(){
     fstab_output="$(genfstab -U "${installdir}")"
     (
         if [[ "${install_type}" =~ ^(u|U)$ ]] && ! [[ "${bootloader}" =~ ^(g|G) ]]; then
-            echo "${fstab_output}" | sed "s:/mnt/mnt:/mnt:g"
+            echo "${fstab_output//\/mnt\/mnt/\/mnt}"
         else
             echo "${fstab_output}"
         fi
@@ -162,11 +162,15 @@ add_grub_entry(){
 	chrun "grub-mkconfig -o /boot/grub/grub.cfg" "Create GRUB configuration"
     echo "Adding Arch ZFS entry to GRUB menu..."
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux-lts \
-        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux-lts.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
+    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\"' \
+        '{\n\tlinux /ROOT/default/@/boot/vmlinuz-linux-lts '"zfs=${zroot}/ROOT/default" \
+        ' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux-lts.img\n}"; x=1; next} 1' \
+        "${installdir}/boot/grub/grub.cfg"
     else
-    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
-        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
+    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\"' \
+        ' {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux '"zfs=${zroot}/ROOT/default" \
+        ' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' \
+        "${installdir}/boot/grub/grub.cfg"
 	fi
 }
 
@@ -286,7 +290,7 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
     if dialog --clear --title "Disk layout" --yesno "View disk layout before choosing zpool partitions?" $HEIGHT $WIDTH; then
         file="$(mktemp)"
         lsdsks > "${file}"
-        dialog --tailbox ${file} 0 0
+        dialog --tailbox "${file}" 0 0
     fi
 
     diskinfo="$(get_disks)"
