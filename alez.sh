@@ -66,7 +66,7 @@ chrun() {
 lsdsks() {
 	lsblk
 	echo -e "\nAttached disks : \n"
-	disks=(`lsblk | grep disk | awk '{print $1}'`)
+	mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
 	ndisks=${#disks[@]}
 	for (( d=0; d<${ndisks}; d++ )); do
 	   echo -e "$d - ${disks[d]}\n"
@@ -82,7 +82,8 @@ lsparts() {
     echo -e "Available partitions:\n\n"
 
     # Read partitions into an array and print enumerated, only show partuuid if show_partuuid=true
-    partids=($(ls /dev/disk/by-id/* $(${show_partuuid} && ls /dev/disk/by-partuuid/* || : ;)))
+    # shellcheck disable=SC2046
+    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_partuuid} && ls /dev/disk/by-partuuid/* || : ;))
     ptcount=${#partids[@]}
 
     for (( p=0; p<${ptcount}; p++ )); do
@@ -221,7 +222,7 @@ check_mountdir(){
 }
 
 get_disks(){
-    disks=($(lsblk | grep disk | awk '{print $1}'))
+    mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
 	ndisks=${#disks[@]}
 	for (( d=0; d<${ndisks}; d++ )); do
 	   echo "$d"; echo "${disks[d]}"
@@ -230,7 +231,8 @@ get_disks(){
 
 get_parts() {
     # Read partitions into an array and print enumerated
-    partids=($(ls /dev/disk/by-id/* $("${show_partuuid}" && ls /dev/disk/by-partuuid/* || : ;)))
+    # shellcheck disable=SC2046
+    mapfile -t partids < <(ls /dev/disk/by-id/* $("${show_partuuid}" && ls /dev/disk/by-partuuid/* || : ;))
     ptcount=${#partids[@]}
 
     for (( p=0; p<${ptcount}; p++ )); do
