@@ -377,6 +377,7 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
 
     diskinfo="$(get_disks)"
     dlength="$(echo "${diskinfo}" | wc -l)"
+    # shellcheck disable=SC2086
     blkdev=$(dialog --stdout --clear --title "Install type" \
                     --menu "Select a disk" $HEIGHT $WIDTH "${dlength}" ${diskinfo})
 
@@ -414,6 +415,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     if dialog --clear --title "Disk layout" --yesno "View partition layout?" $HEIGHT $WIDTH; then
         partsfile="$(mktemp)"
         lsparts > "${partsfile}"
+        # shellcheck disable=SC2086
         dialog --tailbox ${partsfile} 0 0
     fi
 
@@ -422,9 +424,11 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
 
     if [ "$zpconf" == "s" ]; then
         msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
+        # shellcheck disable=SC2086
         zps=$(dialog --stdout --clear --title "Choose partition" \
                      --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
+            # shellcheck disable=SC2046
             zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
         else
             zpool create -f -d -m none -o ashift=12 "${zroot}" "${partids[$zps]}"
@@ -432,6 +436,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         dialog --title "Success" --msgbox "Created a single disk zpool with ${partids[$zps]}...." ${HEIGHT} ${WIDTH}
         break
     elif [ "$zpconf" == "m" ]; then
+        # shellcheck disable=SC2086
         zp1=$(dialog --stdout --clear --title "First zpool partition" \
                      --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + plength ))" ${partinfo})
         # shellcheck disable=SC2086
@@ -440,6 +445,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
 
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
+            # shellcheck disable=SC2046
             zpool create "${zroot}" mirror -f -d -m none \
                 -o ashift=12 \
                 $(print_features) "${partids[$zp1]}" "${partids[$zp2]}"
@@ -494,12 +500,13 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     if dialog --clear --title "Disk layout" --yesno "View partition layout before creating esp?" $HEIGHT $WIDTH; then
         partsfile="$(mktemp)"
         lsparts > "${partsfile}"
+        # shellcheck disable=SC2086
         dialog --tailbox ${partsfile} 0 0
     fi
 
     partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
-
+    # shellcheck disable=SC2086
     esp=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition above that you want to use for an esp" \
                  $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
@@ -539,12 +546,13 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
         if dialog --clear --title "Disk layout" --yesno "View partition layout before GRUB install?" $HEIGHT $WIDTH; then
             partsfile="$(mktemp)"
             lsparts > "${partsfile}"
+            # shellcheck disable=SC2086
             dialog --tailbox ${partsfile} 0 0
         fi
 
         partinfo="$(get_disks)"
         plength="$(echo "${partinfo}" | wc -l)"
-
+        # shellcheck disable=SC2086
         grubdisk=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition on which you want to install GRUB:" \
                  $HEIGHT $WIDTH "${plength}" ${partinfo})
