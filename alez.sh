@@ -68,7 +68,7 @@ lsdsks() {
 	echo -e "\nAttached disks : \n"
 	mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
 	ndisks=${#disks[@]}
-	for (( d=0; d<${ndisks}; d++ )); do
+	for (( d=0; d<ndisks; d++ )); do
 	   echo -e "$d - ${disks[d]}\n"
 	done
 }
@@ -86,8 +86,8 @@ lsparts() {
     mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_partuuid} && ls /dev/disk/by-partuuid/* || : ;))
     ptcount=${#partids[@]}
 
-    for (( p=0; p<${ptcount}; p++ )); do
-        echo -e "$p - ${partids[p]} -> $(readlink ${partids[p]})\n"
+    for (( p=0; p<ptcount; p++ )); do
+        echo -e "$p - ${partids[p]} -> $(readlink "${partids[p]}")\n"
     done
 }
 
@@ -174,7 +174,6 @@ install_arch(){
         { reflector --verbose --latest 25 \
                 --sort rate --save /etc/pacman.d/mirrorlist || : ; } 2> /dev/null
     fi
-
     {
         if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
             pacman -Sg base | cut -d ' ' -f 2 | sed 's/^linux$/linux-lts/g' | \
@@ -290,7 +289,7 @@ check_mountdir(){
 get_disks(){
     mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
 	ndisks=${#disks[@]}
-	for (( d=0; d<${ndisks}; d++ )); do
+	for (( d=0; d<ndisks; d++ )); do
 	   echo "$d"; echo "${disks[d]}"
 	done
 }
@@ -300,8 +299,7 @@ get_parts() {
     # shellcheck disable=SC2046
     mapfile -t partids < <(ls /dev/disk/by-id/* $("${show_partuuid}" && ls /dev/disk/by-partuuid/* || : ;))
     ptcount=${#partids[@]}
-
-    for (( p=0; p<${ptcount}; p++ )); do
+    for (( p=0; p<ptcount; p++ )); do
         echo "$p" "${partids[p]}"
     done
 }
@@ -421,7 +419,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     if [ "$zpconf" == "s" ]; then
         msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
         zps=$(dialog --stdout --clear --title "Choose partition" \
-                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
         else
@@ -431,9 +429,10 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         break
     elif [ "$zpconf" == "m" ]; then
         zp1=$(dialog --stdout --clear --title "First zpool partition" \
-                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + plength ))" ${partinfo})
+        # shellcheck disable=SC2086
         zp2=$(dialog --stdout --clear --title "Second zpool partition" \
-                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + plength ))" ${partinfo})
 
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
@@ -498,8 +497,8 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     plength="$(echo "${partinfo}" | wc -l)"
 
     esp=$(dialog --stdout --clear --title "Install type" \
-                 --menu "Enter the number of the partition that you want to use for an ESP:" \
-                 $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                 --menu "Enter the number of the partition above that you want to use for an esp" \
+                 $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
 
     efi_partition="${partids[$esp]}"
     mkfs.fat -F 32 "${efi_partition}"| dialog --progressbox 10 70
