@@ -1,14 +1,11 @@
 sudo: required
 env:
   global:
-  - DOCKER_TAG=alezbuild
+    - DOCKER_TAG=alezbuild
 services:
-- docker
-before_install:
-- docker build -t "$DOCKER_TAG" ./
+  - docker
 script:
 - mkdir out
-- docker run --privileged --volume="/dev:/dev" --volume="$PWD/out:/opt/alez/iso/out" "$DOCKER_TAG"
 notifications:
   email:
     on_success: change
@@ -16,6 +13,10 @@ notifications:
 branches:
   only:
     - master
+after_success:
+  - docker build -t "$DOCKER_TAG" ./
+  - mkdir out
+  - docker run --privileged --volume="/dev:/dev" --volume="$PWD/out:/opt/alez/iso/out" "$DOCKER_TAG"
 before_deploy:
   # Set up git user name and tag this commit
   - git config --local user.name "$(git log -1 $TRAVIS_COMMIT --pretty="%aN")"
