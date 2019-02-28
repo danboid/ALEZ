@@ -17,14 +17,20 @@ before_install:
     fi
 script:
   - shellcheck alez.sh
-  - export ALEZ_ISO_REL="${ALEZ_ISO_PREFIX}-$(date +"%Y.%m.%d".%H.%M.%S)"
-  - docker build -t "$DOCKER_TAG" --build-arg ALEZ_ISO="${ALEZ_ISO_REL}" ./
+  - ISO_VER="$(date +"%Y.%m.%d.%H.%M.%S")"
+  - export ALEZ_ISO_REL="${ALEZ_ISO_PREFIX}-${ISO_VER}"
+  - docker build -t "$DOCKER_TAG" ./
   - mkdir out
   - |
     docker run --privileged \
       --volume="/dev:/dev" \
       --volume="$PWD/out:/opt/alez/iso/out" \
-      "$DOCKER_TAG"; export ISO_RESULT=$?
+      "$DOCKER_TAG" \
+      ./build.sh -v \
+        -N ${ALEZ_ISO_PREFIX} \
+        -V ${ISO_VER} \
+        -P ${ALEZ_PUBLISHER}; \
+    export ISO_RESULT=$?
 before_cache:
   # Save tagged docker images
   - |
@@ -48,7 +54,7 @@ deploy:
   file: "${RELEASE_ISO}"
   skip_cleanup: true
   on:
-    branch: mastee
+    branch: master
     condition: ${ISO_RESULT} = 0
 notifications:
   email:

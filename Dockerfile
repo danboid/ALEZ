@@ -1,8 +1,6 @@
 FROM archlinux/base
 
 ARG ALEZ_BUILD_DIR='/opt/alez'
-ARG ALEZ_PUBLISHER='alez'
-ARG ALEZ_ISO='archlinux-alez'
 ARG ARCHZFS_KEY='F75D9D76'
 
 RUN pacman -Syu --noconfirm --needed base base-devel git archiso
@@ -31,4 +29,4 @@ RUN chmod +x "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
 VOLUME "${ALEZ_BUILD_DIR}/iso/out"
 
 WORKDIR "${ALEZ_BUILD_DIR}/iso"
-CMD ["bash", "-c", "./build.sh -v -N \"${ALEZ_ISO}\" -P \"${ALEZ_PUBLISHER}\""]
+CMD ["./build.sh", "-v"]
