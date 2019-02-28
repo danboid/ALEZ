@@ -5,6 +5,16 @@ env:
     - ALEZ_ISO_PREFIX="archlinux-alez"
 services:
   - docker
+cache:
+  directories:
+    - $HOME/docker
+before_install:
+  # Load cached docker images
+  - |
+    if [[ -d $HOME/docker ]]; then \
+      ls $HOME/docker/*.tar.gz | \
+      xargs -I {file} sh -c "zcat {file} | docker load"; \
+    fi
 script:
   - shellcheck alez.sh
   - export ALEZ_ISO_REL="${ALEZ_ISO_PREFIX}-$(date +"%Y.%m.%d".%H.%M.%S)"
@@ -15,14 +25,14 @@ script:
       --volume="/dev:/dev" \
       --volume="$PWD/out:/opt/alez/iso/out" \
       "$DOCKER_TAG"; export ISO_RESULT=$?
-notifications:
-  email:
-    on_success: change
-    on_failure: always
-branches:
-  only:
-    - master
-    - shellcheck
+before_cache:
+  # Save tagged docker images
+  - |
+    mkdir -p $HOME/docker && \
+    docker images -a --filter='dangling=false' \
+                     --format '{{.Repository}}:{{.Tag}} {{.ID}}' | \
+    xargs -n 2 -t \
+    sh -c 'test -e $HOME/docker/$1.tar.gz || docker save $0 | gzip -2 > $HOME/docker/$1.tar.gz'
 before_deploy:
   # Set up git user name and tag this commit
   - git config --local user.name "$(git log -1 $TRAVIS_COMMIT --pretty="%aN")"
@@ -38,4 +48,12 @@ deploy:
   file: "${RELEASE_ISO}"
   skip_cleanup: true
   on:
+    branch: mastee
     condition: ${ISO_RESULT} = 0
+notifications:
+  email:
+    on_success: change
+    on_failure: always
+branches:
+  only:
+    - /.*/
