@@ -3,6 +3,7 @@ env:
   global:
     - DOCKER_TAG=alezbuild
     - ALEZ_ISO_PREFIX="archlinux-alez"
+    - ALEZ_PUBLISHER="alez"
 services:
   - docker
 cache:
