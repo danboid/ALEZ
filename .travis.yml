@@ -13,7 +13,7 @@ script:
     docker run --privileged \
       --volume="/dev:/dev" \
       --volume="$PWD/out:/opt/alez/iso/out" \
-      --build-arg ALEZ_ISO="${ALEZ_ISO}"
+      --build-arg ALEZ_ISO="${ALEZ_ISO}" \
       "$DOCKER_TAG"; export ISO_RESULT=$?
 notifications:
   email:
