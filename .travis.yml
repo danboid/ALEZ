@@ -7,13 +7,12 @@ services:
   - docker
 script:
   - shellcheck alez.sh
-  - docker build -t "$DOCKER_TAG" ./
+  - docker build -t "$DOCKER_TAG" --build-arg ALEZ_ISO="${ALEZ_ISO}" ./
   - mkdir out
   - |
     docker run --privileged \
       --volume="/dev:/dev" \
       --volume="$PWD/out:/opt/alez/iso/out" \
-      --build-arg ALEZ_ISO="${ALEZ_ISO}" \
       "$DOCKER_TAG"; export ISO_RESULT=$?
 notifications:
   email:
@@ -27,7 +26,9 @@ before_deploy:
   # Set up git user name and tag this commit
   - git config --local user.name "$(git log -1 $TRAVIS_COMMIT --pretty="%aN")"
   - git config --local user.email "$(git log -1 $TRAVIS_COMMIT --pretty="%cE")"
-  - export TRAVIS_TAG=${TRAVIS_TAG:-"${ALEZ_ISO}-$(git log --format=%h -1)"}
+  - REL="${ALEZ_ISO}-$(git log --format=%h -1)"
+  - export TRAVIS_TAG=${TRAVIS_TAG:-"${REL}"}
+  - echo "Tagging ${TRAVIS_TAG}"
   - git tag $TRAVIS_TAG
   - export RELEASE_ISO="$(ls out/*)"
 deploy:
@@ -36,3 +37,5 @@ deploy:
     secure: RmIS2n4YAMQHQWGgkOdYd0NDT/v1x2Lsm3oC0kM3KCsjpDAeqmGDDIcrdukKCSc/NxiQaobMYBR4ox/an/3QwyGZkapRl+q1fKvoSfpuExGKcYuNc3ok+2r3mP3+aqx7jQZyDzryBlGov4IxWLwutahZ3dOFoZfL/tyhZmdn4FkcFHNsVi/JwSq247NUAI36CEbQ9H/hby+j3oQvX26SYCzzob8kfz7nUPX2UZmWfVRmgEbyCZtPR9FRo5SEfsRsTPEdgyP4tCO/dms3swYyL99/eEWnqDJ7dtI5SU0XgHogKg/jwlrnZM4RKCTG0dAv57A9ZCpyGaMUoSn1FUx5aABSUqswcNgKEkSuDKh5auB8u69PqgQpqNjrL6rvJzFklycy5uyfWv44kQgneQ3Znp/DLrW5+QokWwykVUedbbQNPF0WZ68pSbNBHaeawyAeYU2MLHdy0jSQrglXXo0lqnZI+JIaIJ9sA0VO0iRy24LkdrGghCw4Iu427Ak1tdoUK9v4LI0i88f8jfeveuGt6PCJWz7wlnUGK9skYZ8nypOAfPrHeO95lmF9uVe9qp5nvcVVrXjpq2n9KvkzFbrqblxqV4aDisAEUBZRF2dyEK+YOI5Ia6awZTWIqmAvb3hW4F3EHnsEhS9ed2l1VB1lYN+mDvzqhKaGqvLNyrBAsEI=
   file: "${RELEASE_ISO}"
   skip_cleanup: true
+  on:
+    condition: ${ISO_RESULT} = 0
