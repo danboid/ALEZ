@@ -31,4 +31,4 @@ RUN chmod +x "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
 VOLUME "${ALEZ_BUILD_DIR}/iso/out"
 
 WORKDIR "${ALEZ_BUILD_DIR}/iso"
-CMD ["./build.sh", "-v", "-N", "${ALEZ_ISO}", "-P", "${ALEZ_PUBLISHER}"]
+CMD ["bash", "-c", "./build.sh -v -N \"${ALEZ_ISO}\" -P \"${ALEZ_PUBLISHER}\""]
