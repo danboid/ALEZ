@@ -7,7 +7,8 @@ services:
   - docker
 script:
   - shellcheck alez.sh
-  - docker build -t "$DOCKER_TAG" --build-arg ALEZ_ISO="${ALEZ_ISO}" ./
+  - export ALEZ_ISO_REL="${ALEZ_ISO_PREFIX}-$(date +"%Y.%m.%d".%H.%M.%S)"
+  - docker build -t "$DOCKER_TAG" --build-arg ALEZ_ISO="${ALEZ_ISO_REL}" ./
   - mkdir out
   - |
     docker run --privileged \
@@ -26,8 +27,7 @@ before_deploy:
   # Set up git user name and tag this commit
   - git config --local user.name "$(git log -1 $TRAVIS_COMMIT --pretty="%aN")"
   - git config --local user.email "$(git log -1 $TRAVIS_COMMIT --pretty="%cE")"
-  - REL="${ALEZ_ISO)PREFIX}-$(date +"%Y.%m.%d")-$(git log --format=%h -1)"
-  - export TRAVIS_TAG=${TRAVIS_TAG:-"${REL}"}
+  - export TRAVIS_TAG=${TRAVIS_TAG:-"${ALEZ_ISO_REL}"}
   - echo "Tagging ${TRAVIS_TAG}"
   - git tag $TRAVIS_TAG
   - export RELEASE_ISO="$(ls out/*)"
