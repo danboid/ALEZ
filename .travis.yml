@@ -27,7 +27,7 @@ before_deploy:
   # Set up git user name and tag this commit
   - git config --local user.name "$(git log -1 $TRAVIS_COMMIT --pretty="%aN")"
   - git config --local user.email "$(git log -1 $TRAVIS_COMMIT --pretty="%cE")"
-  - REL="${ALEZ_ISO}-$(git log --format=%h -1)" && export TRAVIS_TAG=${TRAVIS_TAG:-${REL}}
+  - export TRAVIS_TAG=${TRAVIS_TAG:-"${ALEZ_ISO}-$(git log --format=%h -1)"}
   - git tag $TRAVIS_TAG
   - export RELEASE_ISO="$(ls out/*)"
 deploy:
