@@ -57,7 +57,7 @@ archzfs key import fails
 If ALEZ abruptly 'completes' near the start of the install, it could be that it failed to import the key for the archzfs repo because the archlinux-keyring PGP signatures package included on the iso is outdated. Rather than waiting for a new ISO to be uploaded you can follow the instructions in create-alez-iso.txt to create an updated ISO.
 
 
-Installing under virt-manager 1.x / qemu
+Running ALEZ under virt-manager / qemu
 ----------------------------------------
 
-GRUB fails to install under VMs created using the virt-manager 1.x defaults. If you wish to run ALEZ under virt-manager 1.x or qemu, modify the VMs CPU settings to enable 'Copy host CPU configuration' mode.
+GRUB fails to install under VMs created using the virt-manager defaults because it defaults to using an IDE disk bus. Change your VM disk bus to SATA before running the installer.
