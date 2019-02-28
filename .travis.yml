@@ -2,7 +2,7 @@ sudo: required
 env:
   global:
     - DOCKER_TAG=alezbuild
-    - ALEZ_ISO="archlinux-alez-$(date +"%Y.%m.%d")"
+    - ALEZ_ISO_PREFIX="archlinux-alez"
 services:
   - docker
 script:
@@ -26,7 +26,7 @@ before_deploy:
   # Set up git user name and tag this commit
   - git config --local user.name "$(git log -1 $TRAVIS_COMMIT --pretty="%aN")"
   - git config --local user.email "$(git log -1 $TRAVIS_COMMIT --pretty="%cE")"
-  - REL="${ALEZ_ISO}-$(git log --format=%h -1)"
+  - REL="${ALEZ_ISO)PREFIX}-$(date +"%Y.%m.%d")-$(git log --format=%h -1)"
   - export TRAVIS_TAG=${TRAVIS_TAG:-"${REL}"}
   - echo "Tagging ${TRAVIS_TAG}"
   - git tag $TRAVIS_TAG
