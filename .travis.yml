@@ -1,26 +1,31 @@
 sudo: required
 env:
   global:
-  - DOCKER_TAG=alezbuild
+    - DOCKER_TAG=alezbuild
+    - ALEZ_ISO_PREFIX="archlinux-alez"
+    - ALEZ_PUBLISHER="alez"
 services:
-- docker
-before_install:
-- docker build -t "$DOCKER_TAG" ./
+  - docker
 script:
-- mkdir out
-- docker run --privileged --volume="/dev:/dev" --volume="$PWD/out:/opt/alez/iso/out" "$DOCKER_TAG"
-notifications:
-  email:
-    on_success: change
-    on_failure: always
-branches:
-  only:
-    - master
+  - ISO_VER="$(date +"%Y.%m.%d.%H.%M.%S")"
+  - export ALEZ_ISO_REL="${ALEZ_ISO_PREFIX}-${ISO_VER}"
+  - docker build -t "$DOCKER_TAG" ./
+  - mkdir out
+  - |
+    docker run --privileged \
+      --volume="/dev:/dev" \
+      --volume="$PWD/out:/opt/alez/iso/out" \
+      "$DOCKER_TAG" \
+      ./build.sh -v \
+        -N ${ALEZ_ISO_PREFIX} \
+        -V ${ISO_VER} \
+        -P ${ALEZ_PUBLISHER}; \
+    export ISO_RESULT=$?
 before_deploy:
   # Set up git user name and tag this commit
   - git config --local user.name "$(git log -1 $TRAVIS_COMMIT --pretty="%aN")"
   - git config --local user.email "$(git log -1 $TRAVIS_COMMIT --pretty="%cE")"
-  - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+  - export TRAVIS_TAG=${TRAVIS_TAG:-"${ALEZ_ISO_REL}"}
   - git tag $TRAVIS_TAG
   - export RELEASE_ISO="$(ls out/*)"
 deploy:
@@ -29,3 +34,13 @@ deploy:
     secure: "NXLITaKOXfN495LCfJgYBgC80aWqRgmsznOs5wJoCErKdMxiRHSabIMuoTKoinntJ4mF+GJkiPTL+EztZ6DlFYQOug1dBNmZ+8y1aWx9yI+BCLT6aORolkB43nj6zuz6XofgUrM5xypsTgonEXA/Qve2AyEvB9UjfiHqknFFgdUcjFjkimOAVtTyYeKzroIpkl/LwJhta208FLR6Vv3AlxPkVC5ijedBYF5lngiGwCem11FdNzL0znp0bETdQaBnr8oIrS7mLm+SqpNpI0NDQutHI2XCmAQZ6qtlUlQJaXnfD2lsEwgNUtPsg2N7Gw3rYfsy+YtUiJK60f4/h7YYbF+y/NVUfGfHjC2JawuNi+J4LoxQgkgL/f6iFywKtZwQiC4wRyEA3+lp5O/3ejGqTKvBDojyOCwepEj1rJsFZZFwg6MLxcIzyT96IBRdKha9AbsIOgMt5WXcvZmxA+Hd4nOYLE7XOvcX4zAU2EY79236XKaJ2vzbFwrZBB+wc3oOtmhDZxiy8H/C2Tm/CztAlGeumWk3sBbQVI2+p8ijDpmcQlhxmixWfMBJDGiOb5bTTLnbReeDFB2j39GcZhBKkrAnhLuqvmIS+hJz2p/TYvbuy5x/TKYUe+jPZkB6NmRSzgLHKmc5Y4K6dhqc76sii558OvKmf6V82pELsatCkxA="
   file: "${RELEASE_ISO}"
   skip_cleanup: true
+  on:
+    branch: master
+    condition: ${ISO_RESULT} = 0
+notifications:
+  email:
+    on_success: change
+    on_failure: always
+branches:
+  only:
+    - /.*/
