@@ -345,9 +345,9 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         break
     elif [ "$zpconf" == "m" ]; then
         zp1=$(dialog --stdout --clear --title "First zpool partition" \
-                     --radiolist "Select the number of the first partition" $HEIGHT $WIDTH "${plength}" ${partinfo})
+                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
         zp2=$(dialog --stdout --clear --title "Second zpool partition" \
-                     --radiolist "Select the number of the second partition" $HEIGHT $WIDTH "${plength}" ${partinfo})
+                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
 
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
