@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Arch Linux Easy ZFS (ALEZ) installer 0.7
-# by Dan MacDonald 2016-2018 with contributions from John Ramsden
+# Arch Linux Easy ZFS (ALEZ) installer 0.8
+# by Dan MacDonald with contributions from John Ramsden
 
 # Exit on error
 set -o errexit -o errtrace
