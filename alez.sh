@@ -321,7 +321,7 @@ done
 msg="Do you want to create a new zpool?"
 while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     zpconf=$(dialog --stdout --clear --title "Install type" \
-                    --menu "Single disc, or mirrorred zpool?" $HEIGHT $WIDTH 4 "s" "Single disc" "m" "Mirrored")
+                    --menu "Single disc, or mirrored zpool?" $HEIGHT $WIDTH 4 "s" "Single disc" "m" "Mirrored")
 
     if dialog --clear --title "Disk layout" --yesno "View partition layout?" $HEIGHT $WIDTH; then
         partsfile="$(mktemp)"
@@ -412,7 +412,7 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     plength="$(echo "${partinfo}" | wc -l)"
 
     esp=$(dialog --stdout --clear --title "Install type" \
-                 --menu "Enter the number of the partition above that you want to use for an esp" \
+                 --menu "Enter the number of the partition that you want to use for an ESP:" \
                  $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
 
     efi_partition="${partids[$esp]}"
@@ -457,7 +457,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
         plength="$(echo "${partinfo}" | wc -l)"
 
         grubdisk=$(dialog --stdout --clear --title "Install type" \
-                 --menu "Enter the number of the partition above that you want to install to" \
+                 --menu "Enter the number of the partition on which you want to install GRUB:" \
                  $HEIGHT $WIDTH "${plength}" ${diskinfo})
 
         install_grub "/dev/${disks[${grubdisk}]}" | dialog --progressbox 30 70
