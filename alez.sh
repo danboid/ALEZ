@@ -237,6 +237,12 @@ get_parts() {
     done
 }
 
+# Define a multiline variable
+define() {
+    # shellcheck disable=SC2086
+    IFS=$'\n' read -r -d '' ${1} || : ;
+}
+
 ## MAIN ##
 
 trap error_cleanup ERR     # Run on error
@@ -248,11 +254,22 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
-       --msgbox "Please make sure you are connected to the Internet before running ALEZ." ${HEIGHT} ${WIDTH}
+if [ -f /sys/firmware/efi/fw_platform_size ]; then
+    install_type=u
+    system_mode=UEFI
+else
+    install_type=b
+    system_mode=BIOS
+fi
 
-install_type=$(dialog --stdout --clear --title "Install type" \
-                      --menu "Please select:" $HEIGHT $WIDTH 4 "u" "UEFI" "b" "BIOS")
+define welcome_msg <<EOF
+Running in ${system_mode} mode.
+Please make sure you are connected to the Internet before running ALEZ.
+EOF
+
+# shellcheck disable=SC2154
+dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
+       --msgbox "${welcome_msg}" ${HEIGHT} ${WIDTH}
 
 kernel_type=$(dialog --stdout --clear --title "Kernel type" \
                      --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable" "l" "Longterm")
