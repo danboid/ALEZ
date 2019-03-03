@@ -458,7 +458,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
         grubdisk=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition above that you want to install to" \
-                 $HEIGHT $WIDTH "${plength}" ${partinfo})
+                 $HEIGHT $WIDTH "${plength}" ${diskinfo})
 
         install_grub "/dev/${disks[${grubdisk}]}" | dialog --progressbox 30 70
 
