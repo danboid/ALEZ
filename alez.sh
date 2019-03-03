@@ -120,9 +120,9 @@ install_arch(){
     echo "Installing Arch base system..."
 	
 	if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-		pacman -Sg base | cut -d ' ' -f 2 | sed s/\^linux\$/linux-lts/g | pacstrap ${installdir} -
+		pacman -Sg base | cut -d ' ' -f 2 | sed s/\^linux\$/linux-lts/g | pacstrap ${installdir} - linux-lts-headers
 	else
-		pacstrap ${installdir} base
+		pacstrap ${installdir} base linux-headers
 	fi
 
     chrun "pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
