@@ -169,7 +169,7 @@ add_grub_entry(){
 }
 
 install_grub(){
-    chrun "grub-install /dev/${disks[$gn]}" "Installing GRUB to /dev/${disks[$gn]}..."
+    chrun "grub-install /dev/${disks[${1}]}" "Installing GRUB to /dev/${disks[${1}]}..."
 }
 
 install_grub_efi(){
@@ -458,9 +458,9 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
         grubdisk=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition on which you want to install GRUB:" \
-                 $HEIGHT $WIDTH "${plength}" ${diskinfo})
+                 $HEIGHT $WIDTH "${plength}" ${partinfo})
 
-        install_grub "/dev/${disks[${grubdisk}]}" | dialog --progressbox 30 70
+        install_grub "${grubdisk}" | dialog --progressbox 30 70
 
         autopart="Do you want to select another drive to install GRUB onto?"
         declare -a aflags=(--clear --title 'Install GRUB' --defaultno --yesno)
