@@ -3,7 +3,7 @@ FROM archlinux/base
 ARG ALEZ_BUILD_DIR='/opt/alez'
 ARG ARCHZFS_KEY='F75D9D76'
 
-RUN pacman -Syu --noconfirm --needed base base-devel git archiso
+RUN pacman -Syu --noconfirm --needed base base-devel git archiso reflector curl
 
 RUN rm -rf /etc/pacman.d/gnupg && \
     pacman-key --init && pacman-key --populate archlinux && \

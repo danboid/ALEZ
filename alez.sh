@@ -119,6 +119,12 @@ uefi_partitioning(){
 install_arch(){
     echo "Installing Arch base system..."
 	
+    if hash reflector 2>/dev/null; then
+        echo "Refreshing mirrorlist"
+        { reflector --verbose --latest 25 \
+                --sort rate --save /etc/pacman.d/mirrorlist || : ; } &> /dev/null
+    fi
+    
 	if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
 		pacman -Sg base | cut -d ' ' -f 2 | sed s/\^linux\$/linux-lts/g | pacstrap ${installdir} - linux-lts-headers
 	else
