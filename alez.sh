@@ -58,7 +58,7 @@ error_cleanup() {
 
 # Run stuff in the ZFS chroot install function with optional message
 chrun() {
-    [[ ! -z "${2}" ]] && echo "${2}"
+    [[ -n "${2}" ]] && echo "${2}"
 	arch-chroot "${installdir}" /bin/bash -c "${1}"
 }
 
