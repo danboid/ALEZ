@@ -58,7 +58,7 @@ error_cleanup() {
 # Run stuff in the ZFS chroot install function with optional message
 chrun() {
     [[ ! -z "${2}" ]] && echo "${2}"
-	arch-chroot "${installdir}" /bin/bash -c "$1"
+	arch-chroot "${installdir}" /bin/bash -c "${1}"
 }
 
 # List and enumerate attached disks function
@@ -116,22 +116,74 @@ uefi_partitioning(){
 
 }
 
+pkg_ver() {
+    grep -oP "${1}" <(pacman -Ss '^'"${2}"'$' | grep -P "${2}"'\s')
+}
+
+depend_ver() {
+    grep -oP '(?<=\b'"${1}\="')(.*)+(?=\b)' <(pacman -S --info "${2}" | grep "Depends On")
+}
+
+# Determine if zfs kernel is out of sync with linux .
+# If needed download the correct kernel from the archive and install it.
+get_matching_kernel() {
+    echo "Getting matching kernel"
+    local kern_suffix kern_match zfs_depend_ver kernel_version pkgdir ala
+    kern_suffix=""
+    [[ "${kernel_type}" =~ ^(l|L)$ ]] && kern_suffix="-lts"
+
+    zfs_depend_ver="$(depend_ver "linux${kern_suffix}" "zfs-linux${kern_suffix}")"
+    kernel_version="$(pkg_ver '(?<=\s)[[:digit:]].*?(?=($|\s))' "linux${kern_suffix}")"
+
+    if [[ "${zfs_depend_ver}" != "${kernel_version}" ]]; then
+       
+        printf "%s\n%s\n" "zfs-linux${kern_suffix} package is out of sync with linux${kern_suffix}." \
+            "Downloading kernel ${kernel_version} from archive"
+
+        # # Get package list
+        ala="https://archive.archlinux.org/packages"
+        kern_match="$(curl --silent "${ala}/.all/index.0.xz" | unxz | grep -P "linux${kern_suffix}-${kernel_version}")"
+        
+        echo "Found ${kern_match} in Arch Linux Archive"
+
+        if [[ -z ${kern_match} ]]; then
+            echo "Failed to find matching kernel"
+            return 1
+        fi
+
+        pkg="${kern_match}.pkg.tar.xz";
+        url="${ala}/l/linux${kern_suffix}/${pkg}"
+        pkgdir="${installdir}"
+
+        mkdir -p "${pkgdir}"
+        curl --progress-bar --output "${pkgdir}/${pkg}" "${url}" && \
+            chrun "pacman -U --noconfirm /${pkg}" && rm "${pkgdir}/${pkg}"
+    fi
+
+    return 0
+}
+
 install_arch(){
     echo "Installing Arch base system..."
-	
-    if hash reflector 2>/dev/null; then
+    pacman -Sy &> /dev/null
+    
+    if hash reflector 2> /dev/null; then
         echo "Refreshing mirrorlist"
         { reflector --verbose --latest 25 \
-                --sort rate --save /etc/pacman.d/mirrorlist || : ; } &> /dev/null
+                --sort rate --save /etc/pacman.d/mirrorlist || : ; } 2> /dev/null
     fi
-    
-	if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-		pacman -Sg base | cut -d ' ' -f 2 | sed s/\^linux\$/linux-lts/g | pacstrap ${installdir} - linux-lts-headers
-	else
-		pacstrap ${installdir} base linux-headers
-	fi
 
-    chrun "pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76" "Adding Arch ZFS repo key in chroot..."
+    {
+        if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+            pacman -Sg base | cut -d ' ' -f 2 | sed 's/^linux$/linux-lts/g' | \
+                    pacstrap "${installdir}" - linux-lts-headers
+        else
+            pacstrap "${installdir}" base linux-headers
+        fi
+    } 2> /dev/null
+
+    chrun "pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76" \
+        "Adding Arch ZFS repo key in chroot..." 2> /dev/null
 
     echo "Add fstab entries..."
     fstab_output="$(genfstab -U "${installdir}")"
@@ -150,13 +202,18 @@ install_arch(){
     echo -e "\nexport ZPOOL_VDEV_NAME_PATH=1" >> "${installdir}/etc/profile"
 
     echo "Modify HOOKS in mkinitcpio.conf..."
-    sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' "${installdir}/etc/mkinitcpio.conf"
+    sed -i 's/HOOKS=.*/HOOKS="base udev autodetect modconf block keyboard zfs filesystems"/g' \
+           "${installdir}/etc/mkinitcpio.conf"
 
-    if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-		chrun "pacman -Sy; pacman -S --noconfirm zfs-linux-lts" "Installing ZFS LTS in chroot..."
-	else
-		chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS stable in chroot..."
-	fi
+    get_matching_kernel
+
+    {
+        if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
+            chrun "pacman -Sy; pacman -S --noconfirm zfs-linux-lts" "Installing ZFS LTS in chroot..."
+        else
+            chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS stable in chroot..."
+        fi
+    } 2> /dev/null
 
     echo -e "Enable systemd ZFS service...\n"
     chrun "systemctl enable zfs.target"
@@ -175,16 +232,19 @@ add_grub_entry(){
 }
 
 install_grub(){
-    chrun "grub-install /dev/${disks[${1}]}" "Installing GRUB to /dev/${disks[${1}]}..."
+    chrun "grub-install /dev/${disks[${1}]}" "Installing GRUB to /dev/${disks[${1}]}..." 2> /dev/null
 }
 
 install_grub_efi(){
-    chrun "pacman -S --noconfirm grub efibootmgr os-prober" "Installing GRUB for UEFI in chroot..."
+    {
+        chrun "pacman -S --noconfirm grub efibootmgr os-prober" \
+            "Installing GRUB for UEFI in chroot..."
+        add_grub_entry
 
-    add_grub_entry
-
-    # Install GRUB EFI
-    chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" "Installing grub-efi to ${1}"
+        # Install GRUB EFI
+        chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" \
+            "Installing grub-efi to ${1}" 
+    } 2> /dev/null
 }
 
 gen_sdboot_entry(){
@@ -197,7 +257,7 @@ EOF
 }
 
 install_sdboot(){
-    chrun "bootctl --path=${1} install" "Installing systemd-boot to ${1}"
+    chrun "bootctl --path=${1} install" "Installing systemd-boot to ${1}" 2> /dev/null
     mkdir -p "${installdir}/${1}/loader/entries"
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
         gen_sdboot_entry "${1}" "linux-lts"
@@ -459,7 +519,7 @@ install_arch | dialog --progressbox 30 70
 # Install GRUB BIOS
 if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
-    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." | dialog --progressbox 30 70
+    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." 2> /dev/null | dialog --progressbox 30 70
     
     add_grub_entry
 
@@ -495,7 +555,7 @@ else
         else
             install_grub_efi "${esp_mountpoint}"
         fi
-    }  | dialog --progressbox 30 70
+    } 2> /dev/null | dialog --progressbox 30 70
 fi
 
 {
@@ -505,7 +565,7 @@ fi
     else
         chrun "mkinitcpio -p linux"
     fi
-} | dialog --progressbox 30 70
+} 2> /dev/null | dialog --progressbox 30 70
 
 unmount_cleanup
 echo "Installation complete. You may now reboot into your new install.   " | dialog --programbox 10 70
