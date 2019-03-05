@@ -5,8 +5,8 @@ ARG ARCHZFS_KEY='F75D9D76'
 
 RUN pacman -Syu --noconfirm --needed base base-devel git archiso reflector curl
 
-RUN rm -rf /etc/pacman.d/gnupg && \
-    pacman-key --init && pacman-key --populate archlinux && \
+RUN mkdir ~/.gnupg && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
+RUN pacman-key --init && pacman-key --populate archlinux && \
     pacman-key -r "${ARCHZFS_KEY}" && pacman-key --lsign-key "${ARCHZFS_KEY}"
 
 RUN mkdir -p "${ALEZ_BUILD_DIR}" && \
