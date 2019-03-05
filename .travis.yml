@@ -7,8 +7,7 @@ env:
 services:
   - docker
 script:
-  # Add tests
-  - echo "Placeholder"
+  - shellcheck alez.sh
 after_success:
   - ISO_VER="$(date +"%Y.%m.%d.%H.%M.%S")"
   - export ALEZ_ISO_REL="${ALEZ_ISO_PREFIX}-${ISO_VER}"
