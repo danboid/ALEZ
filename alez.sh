@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2015
 
 # Arch Linux Easy ZFS (ALEZ) installer 0.8
 # by Dan MacDonald with contributions from John Ramsden
@@ -51,13 +52,13 @@ unmount_cleanup() {
 }
 
 error_cleanup() {
-    echo -e "${RED}WARNING:${NC} Error occurred. Unmounted datasets and exported ${zpool}"
+    echo -e "${RED}WARNING:${NC} Error occurred. Unmounted datasets and exported ${zroot}"
     # Other cleanup
 }
 
 # Run stuff in the ZFS chroot install function with optional message
 chrun() {
-    [[ ! -z "${2}" ]] && echo "${2}"
+    [[ -n "${2}" ]] && echo "${2}"
 	arch-chroot "${installdir}" /bin/bash -c "${1}"
 }
 
@@ -65,9 +66,9 @@ chrun() {
 lsdsks() {
 	lsblk
 	echo -e "\nAttached disks : \n"
-	disks=(`lsblk | grep disk | awk '{print $1}'`)
+	mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
 	ndisks=${#disks[@]}
-	for (( d=0; d<${ndisks}; d++ )); do
+	for (( d=0; d<ndisks; d++ )); do
 	   echo -e "$d - ${disks[d]}\n"
 	done
 }
@@ -81,11 +82,12 @@ lsparts() {
     echo -e "Available partitions:\n\n"
 
     # Read partitions into an array and print enumerated, only show partuuid if show_partuuid=true
-    partids=($(ls /dev/disk/by-id/* $(${show_partuuid} && ls /dev/disk/by-partuuid/* || : ;)))
+    # shellcheck disable=SC2046
+    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_partuuid} && ls /dev/disk/by-partuuid/* || : ;))
     ptcount=${#partids[@]}
 
-    for (( p=0; p<${ptcount}; p++ )); do
-        echo -e "$p - ${partids[p]} -> $(readlink ${partids[p]})\n"
+    for (( p=0; p<ptcount; p++ )); do
+        echo -e "$p - ${partids[p]} -> $(readlink "${partids[p]}")\n"
     done
 }
 
@@ -172,7 +174,6 @@ install_arch(){
         { reflector --verbose --latest 25 \
                 --sort rate --save /etc/pacman.d/mirrorlist || : ; } 2> /dev/null
     fi
-
     {
         if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
             pacman -Sg base | cut -d ' ' -f 2 | sed 's/^linux$/linux-lts/g' | \
@@ -189,7 +190,7 @@ install_arch(){
     fstab_output="$(genfstab -U "${installdir}")"
     (
         if [[ "${install_type}" =~ ^(u|U)$ ]] && ! [[ "${bootloader}" =~ ^(g|G) ]]; then
-            echo "${fstab_output}" | sed "s:/mnt/mnt:/mnt:g"
+            echo "${fstab_output//\/mnt\/mnt/\/mnt}"
         else
             echo "${fstab_output}"
         fi
@@ -222,13 +223,17 @@ install_arch(){
 add_grub_entry(){
 	chrun "grub-mkconfig -o /boot/grub/grub.cfg" "Create GRUB configuration"
     echo "Adding Arch ZFS entry to GRUB menu..."
+    local kern_suffix
+    kern_suffix=""
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux-lts \
-        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux-lts.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
-    else
-    awk -i inplace '/10_linux/ && !x {print $0; print "menuentry \"Arch Linux ZFS\" {\n\tlinux /ROOT/default/@/boot/vmlinuz-linux \
-        '"zfs=${zroot}/ROOT/default"' rw\n\tinitrd /ROOT/default/@/boot/initramfs-linux.img\n}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
+        kern_suffix="-lts"
 	fi
+    # shellcheck disable=SC1004
+    awk -i inplace '/10_linux/ && !x {print $0; print "\
+menuentry \"Arch Linux ZFS\" {\n\
+    \tlinux /ROOT/default/@/boot/vmlinuz-linux'"${kern_suffix}"' '"zfs=${zroot}/ROOT/default"' rw\n\
+    \tinitrd /ROOT/default/@/boot/initramfs-linux'"${kern_suffix}"'.img\n\
+}"; x=1; next} 1' "${installdir}/boot/grub/grub.cfg"
 }
 
 install_grub(){
@@ -286,19 +291,19 @@ check_mountdir(){
 }
 
 get_disks(){
-    disks=($(lsblk | grep disk | awk '{print $1}'))
+    mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
 	ndisks=${#disks[@]}
-	for (( d=0; d<${ndisks}; d++ )); do
+	for (( d=0; d<ndisks; d++ )); do
 	   echo "$d"; echo "${disks[d]}"
 	done
 }
 
 get_parts() {
     # Read partitions into an array and print enumerated
-    partids=($(ls /dev/disk/by-id/* $("${show_partuuid}" && ls /dev/disk/by-partuuid/* || : ;)))
+    # shellcheck disable=SC2046
+    mapfile -t partids < <(ls /dev/disk/by-id/* $("${show_partuuid}" && ls /dev/disk/by-partuuid/* || : ;))
     ptcount=${#partids[@]}
-
-    for (( p=0; p<${ptcount}; p++ )); do
+    for (( p=0; p<ptcount; p++ )); do
         echo "$p" "${partids[p]}"
     done
 }
@@ -367,11 +372,12 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
     if dialog --clear --title "Disk layout" --yesno "View disk layout before choosing zpool partitions?" $HEIGHT $WIDTH; then
         file="$(mktemp)"
         lsdsks > "${file}"
-        dialog --tailbox ${file} 0 0
+        dialog --tailbox "${file}" 0 0
     fi
 
     diskinfo="$(get_disks)"
     dlength="$(echo "${diskinfo}" | wc -l)"
+    # shellcheck disable=SC2086
     blkdev=$(dialog --stdout --clear --title "Install type" \
                     --menu "Select a disk" $HEIGHT $WIDTH "${dlength}" ${diskinfo})
 
@@ -409,6 +415,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     if dialog --clear --title "Disk layout" --yesno "View partition layout?" $HEIGHT $WIDTH; then
         partsfile="$(mktemp)"
         lsparts > "${partsfile}"
+        # shellcheck disable=SC2086
         dialog --tailbox ${partsfile} 0 0
     fi
 
@@ -417,9 +424,11 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
 
     if [ "$zpconf" == "s" ]; then
         msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
+        # shellcheck disable=SC2086
         zps=$(dialog --stdout --clear --title "Choose partition" \
-                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
+            # shellcheck disable=SC2046
             zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
         else
             zpool create -f -d -m none -o ashift=12 "${zroot}" "${partids[$zps]}"
@@ -427,13 +436,16 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         dialog --title "Success" --msgbox "Created a single disk zpool with ${partids[$zps]}...." ${HEIGHT} ${WIDTH}
         break
     elif [ "$zpconf" == "m" ]; then
+        # shellcheck disable=SC2086
         zp1=$(dialog --stdout --clear --title "First zpool partition" \
-                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + plength ))" ${partinfo})
+        # shellcheck disable=SC2086
         zp2=$(dialog --stdout --clear --title "Second zpool partition" \
-                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + plength ))" ${partinfo})
 
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
+            # shellcheck disable=SC2046
             zpool create "${zroot}" mirror -f -d -m none \
                 -o ashift=12 \
                 $(print_features) "${partids[$zp1]}" "${partids[$zp2]}"
@@ -488,15 +500,16 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     if dialog --clear --title "Disk layout" --yesno "View partition layout before creating esp?" $HEIGHT $WIDTH; then
         partsfile="$(mktemp)"
         lsparts > "${partsfile}"
+        # shellcheck disable=SC2086
         dialog --tailbox ${partsfile} 0 0
     fi
 
     partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
-
+    # shellcheck disable=SC2086
     esp=$(dialog --stdout --clear --title "Install type" \
-                 --menu "Enter the number of the partition that you want to use for an ESP:" \
-                 $HEIGHT $WIDTH "$(( 2 + ${plength}))" ${partinfo})
+                 --menu "Enter the number of the partition above that you want to use for an esp" \
+                 $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
 
     efi_partition="${partids[$esp]}"
     mkfs.fat -F 32 "${efi_partition}"| dialog --progressbox 10 70
@@ -533,12 +546,13 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
         if dialog --clear --title "Disk layout" --yesno "View partition layout before GRUB install?" $HEIGHT $WIDTH; then
             partsfile="$(mktemp)"
             lsparts > "${partsfile}"
+            # shellcheck disable=SC2086
             dialog --tailbox ${partsfile} 0 0
         fi
 
         partinfo="$(get_disks)"
         plength="$(echo "${partinfo}" | wc -l)"
-
+        # shellcheck disable=SC2086
         grubdisk=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition on which you want to install GRUB:" \
                  $HEIGHT $WIDTH "${plength}" ${partinfo})
