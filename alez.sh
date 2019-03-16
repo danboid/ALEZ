@@ -103,6 +103,9 @@ bios_partitioning(){
         
     echo "Creating BIOS boot partition"
     sgdisk --new=1:0:+2M --typecode=1:EF02 "${1}"
+    
+    echo "Set boot flag"
+    sgdisk -A 1:set:2 "${1}"
 
     echo "Creating system partition"
     sgdisk --new=2:0:-"${free_space}"M --typecode=2:EF00 "${1}"
