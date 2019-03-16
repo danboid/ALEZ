@@ -100,10 +100,12 @@ zap_partition(){
 bios_partitioning(){
     echo -e "GPT BIOS partitioning ${1}...\n"
     zap_partition "${1}"
-    parted --script "${1}" \
-        mklabel gpt \
-        mkpart non-fs 0% 2 \
-        mkpart primary 2 100% set 1 bios_grub on set 2 boot on
+        
+    echo "Creating BIOS boot partition"
+    sgdisk --new=1:0:+2M --typecode=1:EF02 "${1}"
+
+    echo "Creating system partition"
+    sgdisk --new=2:0:-"${free_space}"M --typecode=2:EF00 "${1}"
 }
 
 uefi_partitioning(){
@@ -111,10 +113,10 @@ uefi_partitioning(){
     zap_partition "${1}"
 
     echo "Creating EFI partition"
-    sgdisk --new="1:1M:+${2}M" --typecode=1:EF00 "${1}"
+    sgdisk --new=1:1M:+"${2}"M --typecode=1:EF00 "${1}"
 
-    echo "Creating solaris partition"
-    sgdisk --new=2:0:0 --typecode=2:BF01 "${1}"
+    echo "Creating system partition"
+    sgdisk --new=2:0:-"${free_space}"M --typecode=2:EF00 "${1}"
 
 }
 
@@ -380,7 +382,8 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
     # shellcheck disable=SC2086
     blkdev=$(dialog --stdout --clear --title "Install type" \
                     --menu "Select a disk" $HEIGHT $WIDTH "${dlength}" ${diskinfo})
-
+	free_space=$(dialog --stdout --clear --title "Free space after ZFS partition" --inputbox "Enter unused space in MB" $HEIGHT $WIDTH "0")
+	
     msg="ALL data on /dev/${disks[$blkdev]} will be lost? Proceed?"
     if dialog --clear --title "Partition disk?" --yesno "${msg}" $HEIGHT $WIDTH; then
         msg="Shred partitions before partitioning /dev/${disks[$blkdev]} (slow)?"
