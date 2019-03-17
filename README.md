@@ -10,7 +10,7 @@ WHAT IS ALEZ?
 
 ALEZ (pronounced like 'ales', as in beer) is a shell script to simplify the process of installing Arch Linux using the ZFS file system.
 
-ALEZ automates the processes of partitioning disks, creating and configuring a ZFS pool and some basic datasets, installing a base Arch Linux system and configuring and installing the GRUB bootloader so that they all play nicely with ZFS. The datasets are structured so as to be usable for ([zedenv](https://github.com/johnramsden/zedenv)) boot environments.
+ALEZ automates the processes of partitioning disks, creating and configuring a ZFS pool and some basic datasets, installing a base Arch Linux system and configuring and installing the GRUB or systemd bootloader so that they all play nicely with ZFS. The defaul datasets are configured to be managed with the ([zedenv](https://github.com/johnramsden/zedenv)) boot environment manager.
 
 
 LIMITATIONS
@@ -18,13 +18,11 @@ LIMITATIONS
 
 ALEZ has a few limitations you need to be aware of:
 
-* 64 bit, x86 (amd64) Arch is the only platform supported by the Arch ZFS repo and hence this script.
+* x86-64/amd64 is the only platform supported by the Arch ZFS repo and hence this script.
 
-* No automated multiboot support.
+* ALEZ only supports partitioning or installing to drives using GPT. ALEZ does not support creating MBR partitions but both BIOS and UEFI machines are supported.
 
-* This script currently only supports partitioning or installing to drives using GPT which requires a small (1-2 MB) unformatted BIOS bootloader partition. This is created automatically by the partitioning feature of ALEZ. ALEZ does not support creating MBR partitions. 
-
-* ALEZ currently only supports creating single or double-drive (mirrored) pools - there is no RAIDZ support yet.
+* It only supports creating single or double disk (mirrored) pools - there is no RAIDZ support.
 
 
 HOW DO I USE IT?
@@ -37,13 +35,7 @@ The easiest way to use ALEZ is to [download archlinux-alez.](https://github.com/
 Stable vs LTS kernel
 --------------------
 
-The stable kernel is the default Linux kernel installed as part of a regular base Arch install. The stable kernel is normally more current than the LTS kernel so it may offer more hardware support and/or features but it also gets updated more often than the LTS kernel. As a result, if you choose the stable kernel option you may encounter the error:
-
-```
-The following package cannot be upgraded due to unresolvable dependecies: zfs-linux
-```
-
-When this happens you have two easy options. Either wait 24 hours for the Arch ZFS repo to update its packages to be in sync with the new Arch stable kernel package or install the LTS kernel.
+The stable kernel is the default Linux kernel installed as part of a regular base Arch install. The stable kernel is normally more current than the LTS kernel so it may offer more hardware support and/or features. It gets updated more often than the LTS kernel.
 
 
 
@@ -61,3 +53,7 @@ Running ALEZ under virt-manager / qemu
 ----------------------------------------
 
 GRUB fails to install under VMs created using the virt-manager defaults because it defaults to using an IDE disk bus. Change your VM disk bus to SATA before running the installer.
+
+
+
+You may also want to check out my other ZFS-related repos, [Creating ZFS disks under Linux](https://github.com/danboid/creating-ZFS-disks-under-Linux) and [ZFS aliases](https://github.com/danboid/ZFS-aliases) - my most used ZFS commands as aliases.

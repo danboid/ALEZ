@@ -1,7 +1,7 @@
 #!/bin/bash
 # shellcheck disable=SC2015
 
-# Arch Linux Easy ZFS (ALEZ) installer 0.8
+# Arch Linux Easy ZFS (ALEZ) installer 1.0
 # by Dan MacDonald with contributions from John Ramsden
 
 # Exit on error
@@ -13,7 +13,7 @@ export LANG=C
 # This is required to fix grub's "failed to get canonical path" error
 export ZPOOL_VDEV_NAME_PATH=1
 
-version=0.8
+version=1.0
 
 # Colors
 RED='\033[0;31m'
