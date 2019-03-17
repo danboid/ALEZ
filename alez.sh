@@ -105,7 +105,7 @@ bios_partitioning(){
     sgdisk --new=1:0:+2M --typecode=1:EF02 "${1}"
 
     echo "Creating system partition"
-    sgdisk --new=2:0:-"${free_space}"M --typecode=2:EF00 "${1}"
+    sgdisk --new=2:0:-"${free_space}"M --typecode=2:BF00 "${1}"
     
     echo "Set legacy BIOS boot flag"
     sgdisk -A 2:set:2 "${1}"
@@ -119,7 +119,7 @@ uefi_partitioning(){
     sgdisk --new=1:1M:+"${2}"M --typecode=1:EF00 "${1}"
 
     echo "Creating system partition"
-    sgdisk --new=2:0:-"${free_space}"M --typecode=2:EF00 "${1}"
+    sgdisk --new=2:0:-"${free_space}"M --typecode=2:BF00 "${1}"
 
 }
 
