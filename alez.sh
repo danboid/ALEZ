@@ -531,7 +531,7 @@ fi
 
 dialog --title "Begin install?" --msgbox "Setup complete, begin install?" ${HEIGHT} ${WIDTH}
 
-{ pacman-key -r "${archzfs_pgp_key}" && pacman-key --lsign-key "${archzfs_pgp_key}" ; } &> /dev/null
+{ pacman-key -r "${archzfs_pgp_key}" --keyserver hkp://pool.sks-keyservers.net && pacman-key --lsign-key "${archzfs_pgp_key}" ; } &> /dev/null
 
 install_arch | dialog --progressbox 30 70
 
