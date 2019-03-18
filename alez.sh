@@ -188,7 +188,7 @@ install_arch(){
         fi
     } 2> /dev/null
 
-    chrun "pacman-key -r F75D9D76 && pacman-key --lsign-key F75D9D76" \
+    chrun "pacman-key -r F75D9D76 --keyserver hkp://pool.sks-keyservers.net && pacman-key --lsign-key F75D9D76" \
         "Adding Arch ZFS repo key in chroot..." 2> /dev/null
 
     echo "Add fstab entries..."
