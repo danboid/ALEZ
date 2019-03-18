@@ -26,7 +26,7 @@ zroot="zroot"
 HEIGHT=0
 WIDTH=0
 
-show_partuuid=false
+show_path=false
 
 declare -a zpool_bios_features
 zpool_bios_features=(
@@ -81,9 +81,9 @@ lsparts() {
     echo -e "If you used alez to create your partitions, you likely want the one ending with -part2\n\n"
     echo -e "Available partitions:\n\n"
 
-    # Read partitions into an array and print enumerated, only show partuuid if show_partuuid=true
+    # Read partitions into an array and print enumerated, only show path if show_path=true
     # shellcheck disable=SC2046
-    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_partuuid} && ls /dev/disk/by-partuuid/* || : ;))
+    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_path} && ls /dev/disk/by-path/* || : ;))
     ptcount=${#partids[@]}
 
     for (( p=0; p<ptcount; p++ )); do
@@ -306,7 +306,7 @@ get_disks(){
 get_parts() {
     # Read partitions into an array and print enumerated
     # shellcheck disable=SC2046
-    mapfile -t partids < <(ls /dev/disk/by-id/* $("${show_partuuid}" && ls /dev/disk/by-partuuid/* || : ;))
+    mapfile -t partids < <(ls /dev/disk/by-id/* $("${show_path}" && ls /dev/disk/by-path/* || : ;))
     ptcount=${#partids[@]}
     for (( p=0; p<ptcount; p++ )); do
         echo "$p" "${partids[p]}"
@@ -366,7 +366,7 @@ fi
 
 # check if vd* disk exists
 if lsblk | grep -E 'vd.*disk'; then
-    [ -d /dev/disk/by-partuuid/ ] && show_partuuid=true
+    [ -d /dev/disk/by-path/ ] && show_path=true
 fi
 
 # No frills GPT partitioning
