@@ -537,8 +537,10 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
     # shellcheck disable=SC2086
+    msg="Enter the number of the partition above that you want to use for an esp.\n\n"
+    msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
     esp=$(dialog --stdout --clear --title "Install type" \
-                 --menu "Enter the number of the partition above that you want to use for an esp" \
+                 --menu "$msg" \
                  $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
 
     efi_partition="${partids[$esp]}"
