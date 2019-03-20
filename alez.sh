@@ -632,7 +632,7 @@ chroot /mnt bash
 
   # inside chroot
   mount -t proc none /proc
-  echo 8.8.8.8 > /etc/resolv.conf
+  echo "nameserver 8.8.8.8" > /etc/resolv.conf
   pacman -S ....
   umount /proc
   exit
