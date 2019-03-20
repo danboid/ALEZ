@@ -217,7 +217,7 @@ install_arch(){
         if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
             chrun "pacman -Sy; pacman -S --noconfirm zfs-linux-lts" "Installing ZFS LTS in chroot..."
         else
-            chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS stable in chroot..."
+            chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS in chroot..."
         fi
     } 2> /dev/null
 
@@ -373,7 +373,7 @@ dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
        --msgbox "${welcome_msg}" ${HEIGHT} ${WIDTH}
 
 kernel_type=$(dialog --stdout --clear --title "Kernel type" \
-                     --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable" "l" "Longterm")
+                     --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Standard" "l" "Longterm")
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     bootloader=$(dialog --stdout --clear --title "UEFI bootloader" \
