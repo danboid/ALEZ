@@ -315,7 +315,7 @@ dialog_menu() {
     local VALUE
 
     for VALUE in "${ARRAY[@]}"; do
-        ((COUNT++))
+        ((COUNT++)) || true # 0++ returns 1 which trips our ERR trap
         PARAMS+=( $COUNT "$VALUE" )
     done
 
