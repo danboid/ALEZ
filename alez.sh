@@ -423,7 +423,7 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
         else
             esp_size=512
             if [[ "${bootloader}" =~ ^(s|S) ]]; then
-                msg="Enter the size of the esp (512 or greater in MiB),\n1024 or greater reccomended to hold multiple kernels"
+                msg="Enter the size of the esp (512 or greater in MiB),\n1024 or greater recommended to hold multiple kernels"
                 esp_size=$(dialog --stdout --clear --title "UEFI partition size" --inputbox "${msg}" $HEIGHT $WIDTH "2048")
                 while [ "$esp_size" -lt "512" ]; do
                     esp_size=$(dialog --stdout --clear --title "UEFI partition size" --inputbox "${msg}" $HEIGHT $WIDTH "2048")
