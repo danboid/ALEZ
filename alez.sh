@@ -307,7 +307,7 @@ get_disks() {
 #  - $2 - title
 #  - $3 - menu description
 # Output
-#  - stdout - selected item
+#  - stdout - selected item or nothing if Cancel was pressed
 dialog_menu() {
     local -a PARAMS
     local COUNT=0
@@ -321,11 +321,14 @@ dialog_menu() {
 
     COUNT=$(
         dialog --stdout --clear --title "$2" \
-            --menu "$3" $HEIGHT $WIDTH $COUNT "${PARAMS[@]}"
+            --menu "$3" $HEIGHT $WIDTH $COUNT "${PARAMS[@]}" \
+            || true # Protect the dialog from ERR trap when user selects "Cancel"
     )
 
-    # Array is numbered from 0
-    echo "${ARRAY[$COUNT-1]}"
+    if [ -n "$COUNT" ]; then
+        # Array is numbered from 0
+        echo "${ARRAY[$COUNT-1]}"
+    fi
 }
 
 get_parts() {
@@ -408,6 +411,10 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
     get_disks
     dlength="$(echo "${diskinfo}" | wc -l)"
     blkdev=$( dialog_menu disks "Install type" "Select a disk" )
+    if [ -z "$blkdev" ]; then
+        # Cancel pressed, let's restart the main loop
+        continue
+    fi
     blkdev="/dev/$blkdev"
     free_space=$(dialog --stdout --clear --title "Should I leave free space after ZFS partition?" --inputbox "Enter unused space in MB" $HEIGHT $WIDTH "0")
 	
