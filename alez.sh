@@ -621,6 +621,24 @@ fi
 } 2> /dev/null | dialog --progressbox 30 70
 
 unmount_cleanup
-echo "Installation complete. You may now reboot into your new install.   " | dialog --programbox 10 70
+dialog --programbox 25 70 <<EOT
+Installation complete. You may now reboot into your new install.
+
+If you want to mount the newly installed system and install more
+packages you can do so via:
+
+zpool import -R /mnt ${zroot}
+chroot /mnt bash
+
+  # inside chroot
+  mount -t proc none /proc
+  echo 8.8.8.8 > /etc/resolv.conf
+  pacman -S ....
+  umount /proc
+  exit
+
+# back out of chroot
+zpool export ${zroot}
+EOT
 
 # vim: tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab
