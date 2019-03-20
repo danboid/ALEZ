@@ -295,12 +295,37 @@ check_mountdir(){
     fi
 }
 
-get_disks(){
-    mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
-	ndisks=${#disks[@]}
-	for (( d=0; d<ndisks; d++ )); do
-	   echo "$d"; echo "${disks[d]}"
-	done
+# Input:
+# Output:
+#  - variable 'disks' - array containing all the disks found
+get_disks() {
+    mapfile -t disks < <(lsblk --noheadings --output type,name | awk '/^disk /{ print $2 }')
+}
+
+# Input:
+#  - $1 - aray name containing the choices
+#  - $2 - title
+#  - $3 - menu description
+# Output
+#  - stdout - selected item
+dialog_menu() {
+    local -a PARAMS
+    local COUNT=0
+    local -n ARRAY=$1
+    local VALUE
+
+    for VALUE in "${ARRAY[@]}"; do
+        ((COUNT++))
+        PARAMS+=( $COUNT "$VALUE" )
+    done
+
+    COUNT=$(
+        dialog --stdout --clear --title "$2" \
+            --menu "$3" $HEIGHT $WIDTH $COUNT "${PARAMS[@]}"
+    )
+
+    # Array is numbered from 0
+    echo "${ARRAY[$COUNT-1]}"
 }
 
 get_parts() {
@@ -380,22 +405,21 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
         dialog --tailbox "${file}" 0 0
     fi
 
-    diskinfo="$(get_disks)"
+    get_disks
     dlength="$(echo "${diskinfo}" | wc -l)"
-    # shellcheck disable=SC2086
-    blkdev=$(dialog --stdout --clear --title "Install type" \
-                    --menu "Select a disk" $HEIGHT $WIDTH "${dlength}" ${diskinfo})
-	free_space=$(dialog --stdout --clear --title "Free space after ZFS partition" --inputbox "Enter unused space in MB" $HEIGHT $WIDTH "0")
+    blkdev=$( dialog_menu disks "Install type" "Select a disk" )
+    blkdev="/dev/$blkdev"
+    free_space=$(dialog --stdout --clear --title "Should I leave free space after ZFS partition?" --inputbox "Enter unused space in MB" $HEIGHT $WIDTH "0")
 	
-    msg="ALL data on /dev/${disks[$blkdev]} will be lost? Proceed?"
+    msg="ALL data on $blkdev will be lost? Proceed?"
     if dialog --clear --title "Partition disk?" --yesno "${msg}" $HEIGHT $WIDTH; then
-        msg="Shred partitions before partitioning /dev/${disks[$blkdev]} (slow)?"
+        msg="Shred partitions before partitioning $blkdev (slow)?"
         if dialog --clear --title "Shred disk?" --defaultno --yesno "${msg}" $HEIGHT $WIDTH; then
-            dialog --prgbox "shred --verbose -n1 /dev/${disks[$blkdev]}" 10 70
+            dialog --prgbox "shred --verbose -n1 $blkdev" 10 70
         fi
 
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
-            bios_partitioning "/dev/${disks[$blkdev]}" | dialog --programbox 10 70
+            bios_partitioning "$blkdev" | dialog --programbox 10 70
         else
             esp_size=512
             if [[ "${bootloader}" =~ ^(s|S) ]]; then
@@ -405,7 +429,7 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
                     esp_size=$(dialog --stdout --clear --title "UEFI partition size" --inputbox "${msg}" $HEIGHT $WIDTH "2048")
                 done
             fi
-            uefi_partitioning "/dev/${disks[$blkdev]}" "${esp_size}" | dialog --programbox 10 70
+            uefi_partitioning "$blkdev" "${esp_size}" | dialog --programbox 10 70
         fi
     fi
     autopart="Do you want to select another drive to be auto-partitioned?"
@@ -589,3 +613,5 @@ fi
 
 unmount_cleanup
 echo "Installation complete. You may now reboot into your new install.   " | dialog --programbox 10 70
+
+# vim: tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab
