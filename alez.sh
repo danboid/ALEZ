@@ -461,7 +461,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
 
     partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
-    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_path} && ls /dev/disk/by-path/* || : ;))
+    mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
 
     if [ "$zpconf" == "s" ]; then
         msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
