@@ -409,7 +409,6 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
     fi
 
     get_disks
-    dlength="$(echo "${diskinfo}" | wc -l)"
     blkdev=$( dialog_menu disks "Install type" "Select a disk" )
     if [ -z "$blkdev" ]; then
         # Cancel pressed, let's restart the main loop
