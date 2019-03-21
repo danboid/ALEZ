@@ -548,7 +548,7 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
     esp=$(dialog --stdout --clear --title "Install type" \
                  --menu "$msg" \
-                 $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
+                 $HEIGHT $WIDTH "$(( 2 + plength))" "${partinfo}")
 
     efi_partition="${partids[$esp]}"
     mkfs.fat -F 32 "${efi_partition}"| dialog --progressbox 10 70
