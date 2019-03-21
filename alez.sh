@@ -298,8 +298,12 @@ check_mountdir(){
 # Input:
 # Output:
 #  - variable 'disks' - array containing all the disks found
-get_disks() {
-    mapfile -t disks < <(lsblk --noheadings --output type,name | awk '/^disk /{ print $2 }')
+get_disks(){
+    mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
+	ndisks=${#disks[@]}
+	for (( d=0; d<ndisks; d++ )); do
+	   echo "$d"; echo "${disks[d]}"
+	done
 }
 
 # Input:
