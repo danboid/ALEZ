@@ -217,7 +217,7 @@ install_arch(){
         if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
             chrun "pacman -Sy; pacman -S --noconfirm zfs-linux-lts" "Installing ZFS LTS in chroot..."
         else
-            chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS stable in chroot..."
+            chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS in chroot..."
         fi
     } 2> /dev/null
 
@@ -295,12 +295,40 @@ check_mountdir(){
     fi
 }
 
-get_disks(){
-    mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
-	ndisks=${#disks[@]}
-	for (( d=0; d<ndisks; d++ )); do
-	   echo "$d"; echo "${disks[d]}"
-	done
+# Input:
+# Output:
+#  - variable 'disks' - array containing all the disks found
+get_disks() {
+    mapfile -t disks < <(lsblk --noheadings --output type,name | awk '/^disk /{ print $2 }')
+}
+
+# Input:
+#  - $1 - aray name containing the choices
+#  - $2 - title
+#  - $3 - menu description
+# Output
+#  - stdout - selected item or nothing if Cancel was pressed
+dialog_menu() {
+    local -a PARAMS
+    local COUNT=0
+    local -n ARRAY=$1
+    local VALUE
+
+    for VALUE in "${ARRAY[@]}"; do
+        ((COUNT++)) || true # 0++ returns 1 which trips our ERR trap
+        PARAMS+=( $COUNT "$VALUE" )
+    done
+
+    COUNT=$(
+        dialog --stdout --clear --title "$2" \
+            --menu "$3" $HEIGHT $WIDTH $COUNT "${PARAMS[@]}" \
+            || true # Protect the dialog from ERR trap when user selects "Cancel"
+    )
+
+    if [ -n "$COUNT" ]; then
+        # Array is numbered from 0
+        echo "${ARRAY[$COUNT-1]}"
+    fi
 }
 
 get_parts() {
@@ -348,7 +376,7 @@ dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
        --msgbox "${welcome_msg}" ${HEIGHT} ${WIDTH}
 
 kernel_type=$(dialog --stdout --clear --title "Kernel type" \
-                     --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable" "l" "Longterm")
+                     --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Standard" "l" "Longterm")
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     bootloader=$(dialog --stdout --clear --title "UEFI bootloader" \
@@ -380,32 +408,35 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
         dialog --tailbox "${file}" 0 0
     fi
 
-    diskinfo="$(get_disks)"
+    get_disks
     dlength="$(echo "${diskinfo}" | wc -l)"
-    # shellcheck disable=SC2086
-    blkdev=$(dialog --stdout --clear --title "Install type" \
-                    --menu "Select a disk" $HEIGHT $WIDTH "${dlength}" ${diskinfo})
-	free_space=$(dialog --stdout --clear --title "Free space after ZFS partition" --inputbox "Enter unused space in MB" $HEIGHT $WIDTH "0")
+    blkdev=$( dialog_menu disks "Install type" "Select a disk" )
+    if [ -z "$blkdev" ]; then
+        # Cancel pressed, let's restart the main loop
+        continue
+    fi
+    blkdev="/dev/$blkdev"
+    free_space=$(dialog --stdout --clear --title "Should I leave free space after ZFS partition?" --inputbox "Enter unused space in MB" $HEIGHT $WIDTH "0")
 	
-    msg="ALL data on /dev/${disks[$blkdev]} will be lost? Proceed?"
+    msg="ALL data on $blkdev will be lost? Proceed?"
     if dialog --clear --title "Partition disk?" --yesno "${msg}" $HEIGHT $WIDTH; then
-        msg="Shred partitions before partitioning /dev/${disks[$blkdev]} (slow)?"
+        msg="Shred partitions before partitioning $blkdev (slow)?"
         if dialog --clear --title "Shred disk?" --defaultno --yesno "${msg}" $HEIGHT $WIDTH; then
-            dialog --prgbox "shred --verbose -n1 /dev/${disks[$blkdev]}" 10 70
+            dialog --prgbox "shred --verbose -n1 $blkdev" 10 70
         fi
 
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
-            bios_partitioning "/dev/${disks[$blkdev]}" | dialog --programbox 10 70
+            bios_partitioning "$blkdev" | dialog --programbox 10 70
         else
             esp_size=512
             if [[ "${bootloader}" =~ ^(s|S) ]]; then
-                msg="Enter the size of the esp (512 or greater in MiB),\n1024 or greater reccomended to hold multiple kernels"
+                msg="Enter the size of the esp (512 or greater in MiB),\n1024 or greater recommended to hold multiple kernels"
                 esp_size=$(dialog --stdout --clear --title "UEFI partition size" --inputbox "${msg}" $HEIGHT $WIDTH "2048")
                 while [ "$esp_size" -lt "512" ]; do
                     esp_size=$(dialog --stdout --clear --title "UEFI partition size" --inputbox "${msg}" $HEIGHT $WIDTH "2048")
                 done
             fi
-            uefi_partitioning "/dev/${disks[$blkdev]}" "${esp_size}" | dialog --programbox 10 70
+            uefi_partitioning "$blkdev" "${esp_size}" | dialog --programbox 10 70
         fi
     fi
     autopart="Do you want to select another drive to be auto-partitioned?"
@@ -513,8 +544,10 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
     # shellcheck disable=SC2086
+    msg="Enter the number of the partition above that you want to use for an esp.\n\n"
+    msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
     esp=$(dialog --stdout --clear --title "Install type" \
-                 --menu "Enter the number of the partition above that you want to use for an esp" \
+                 --menu "$msg" \
                  $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
 
     efi_partition="${partids[$esp]}"
@@ -588,4 +621,24 @@ fi
 } 2> /dev/null | dialog --progressbox 30 70
 
 unmount_cleanup
-echo "Installation complete. You may now reboot into your new install.   " | dialog --programbox 10 70
+dialog --programbox 25 70 <<EOT
+Installation complete. You may now reboot into your new install.
+
+If you want to mount the newly installed system and install more
+packages you can do so via:
+
+zpool import -R /mnt ${zroot}
+chroot /mnt bash
+
+  # inside chroot
+  mount -t proc none /proc
+  echo "nameserver 8.8.8.8" > /etc/resolv.conf
+  pacman -S ....
+  umount /proc
+  exit
+
+# back out of chroot
+zpool export ${zroot}
+EOT
+
+# vim: tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab
