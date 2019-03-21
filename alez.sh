@@ -376,7 +376,7 @@ dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
        --msgbox "${welcome_msg}" ${HEIGHT} ${WIDTH}
 
 kernel_type=$(dialog --stdout --clear --title "Kernel type" \
-                     --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Standard" "l" "Longterm")
+	--menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable (standard)" "l" "Longterm")
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     bootloader=$(dialog --stdout --clear --title "UEFI bootloader" \
