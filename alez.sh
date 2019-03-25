@@ -1,7 +1,7 @@
 #!/bin/bash
 # shellcheck disable=SC2015
 
-# Arch Linux Easy ZFS (ALEZ) installer 1.0
+# Arch Linux Easy ZFS (ALEZ) installer 1.1
 # by Dan MacDonald with contributions from John Ramsden
 
 # Exit on error
@@ -13,7 +13,7 @@ export LANG=C
 # This is required to fix grub's "failed to get canonical path" error
 export ZPOOL_VDEV_NAME_PATH=1
 
-version=1.0
+version=1.1
 
 # Colors
 RED='\033[0;31m'
@@ -53,7 +53,6 @@ unmount_cleanup() {
 
 error_cleanup() {
     echo -e "${RED}WARNING:${NC} Error occurred. Unmounted datasets and exported ${zroot}"
-    # Other cleanup
 }
 
 # Run stuff in the ZFS chroot install function with optional message
@@ -147,7 +146,7 @@ get_matching_kernel() {
         printf "%s\n%s\n" "zfs-linux${kern_suffix} package is out of sync with linux${kern_suffix}." \
             "Downloading kernel ${kernel_version} from archive"
 
-        # # Get package list
+        # Get package list
         ala="https://archive.archlinux.org/packages"
         kern_match="$(curl --silent "${ala}/.all/index.0.xz" | unxz | grep -P "linux${kern_suffix}-${zfs_depend_ver}")"
         
@@ -345,6 +344,13 @@ get_parts() {
     done
 }
 
+update_parts() {
+	partinfo="$(get_parts)"
+    plength="$(echo "${partinfo}" | wc -l)"
+    mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
+}
+	
+
 # Define a multiline variable
 define() {
     # shellcheck disable=SC2086
@@ -396,7 +402,7 @@ else
     bootloader="g"
 fi
 
-# check if vd* disk exists
+# Check if any VirtIO devices exist
 if lsblk | grep -E 'vd.*disk'; then
     [ -d /dev/disk/by-path/ ] && show_path=true
 fi
@@ -459,9 +465,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         dialog --tailbox ${partsfile} 0 0
     fi
 
-    partinfo="$(get_parts)"
-    plength="$(echo "${partinfo}" | wc -l)"
-    mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
+    update_parts
 
     if [ "$zpconf" == "s" ]; then
         msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
@@ -545,8 +549,8 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
         dialog --tailbox ${partsfile} 0 0
     fi
 
-    partinfo="$(get_parts)"
-    plength="$(echo "${partinfo}" | wc -l)"
+    update_parts
+    
     # shellcheck disable=SC2086
     msg="Enter the number of the partition above that you want to use for an esp.\n\n"
     msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
@@ -593,9 +597,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             dialog --tailbox ${partsfile} 0 0
         fi
 
-        partinfo="$(get_disks)"
-        plength="$(echo "${partinfo}" | wc -l)"
-        mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
+        update_parts
         
         # shellcheck disable=SC2086
         grubdisk=$(dialog --stdout --clear --title "Install type" \
@@ -646,5 +648,3 @@ chroot /mnt bash
 # back out of chroot
 zpool export ${zroot}
 EOT
-
-# vim: tabstop=8 softtabstop=0 expandtab shiftwidth=4 smarttab

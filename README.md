@@ -10,7 +10,10 @@ WHAT IS ALEZ?
 
 ALEZ (pronounced like 'ales', as in beer) is a shell script to simplify the process of installing Arch Linux using the ZFS file system.
 
-ALEZ automates the processes of partitioning disks, creating and configuring a ZFS pool and some basic datasets, installing a base Arch Linux system and configuring and installing the GRUB or systemd bootloader so that they all play nicely with ZFS. The defaul datasets are configured to be managed with the ([zedenv](https://github.com/johnramsden/zedenv)) boot environment manager.
+ALEZ automates the processes of partitioning disks, creating and configuring a ZFS pool and some basic datasets, installing a base Arch Linux system 
+and configuring and installing the GRUB or systemd bootloader so that they all play nicely with ZFS. 
+
+The default datasets are configured ready to be managed with the ([zedenv](https://github.com/johnramsden/zedenv)) boot environment manager.
 
 
 LIMITATIONS
@@ -28,7 +31,8 @@ ALEZ has a few limitations you need to be aware of:
 HOW DO I USE IT?
 ----------------
 
-The easiest way to use ALEZ is to [download archlinux-alez.](https://github.com/danboid/ALEZ/releases), which is a version of Arch Linux remastered to include ZFS support and the Arch Linux Easy ZFS (ALEZ) installer. [Transfer the iso onto a USB drive](https://wiki.archlinux.org/index.php/USB_flash_installation_media) (or burn it to a disc) just as you would for the regular Arch iso, boot it and then type 'alez' at the prompt to start the installer.
+The easiest way to use ALEZ is to [download archlinux-alez.](https://github.com/danboid/ALEZ/releases), which is a version of Arch Linux remastered to include ZFS support and the Arch Linux Easy ZFS (ALEZ) installer. 
+[Transfer the iso onto a USB drive](https://wiki.archlinux.org/index.php/USB_flash_installation_media) (or burn it to a disc) just as you would for the regular Arch iso, boot it and then type 'alez' at the prompt to start the installer.
 
 
 
@@ -52,7 +56,7 @@ If ALEZ abruptly 'completes' near the start of the install, it could be that it 
 Running ALEZ under virt-manager / qemu
 ----------------------------------------
 
-GRUB fails to install under VMs created using the virt-manager defaults because it defaults to using an IDE disk bus. Change your VM disk bus to SATA before running the installer.
+GRUB fails to install under VMs created using the virt-manager defaults because it defaults to using an IDE disk bus. Change your VM disk bus to VirtIO or SATA before running ALEZ.
 
 
 
