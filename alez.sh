@@ -595,6 +595,8 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
         partinfo="$(get_disks)"
         plength="$(echo "${partinfo}" | wc -l)"
+        mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
+        
         # shellcheck disable=SC2086
         grubdisk=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition on which you want to install GRUB:" \
