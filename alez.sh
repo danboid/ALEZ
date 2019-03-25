@@ -149,7 +149,7 @@ get_matching_kernel() {
 
         # # Get package list
         ala="https://archive.archlinux.org/packages"
-        kern_match="$(curl --silent "${ala}/.all/index.0.xz" | unxz | grep -P "linux${kern_suffix}-${kernel_version}")"
+        kern_match="$(curl --silent "${ala}/.all/index.0.xz" | unxz | grep -P "linux${kern_suffix}-${zfs_depend_ver}")"
         
         echo "Found ${kern_match} in Arch Linux Archive"
 
