@@ -550,7 +550,7 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     fi
 
 	partinfo="$(get_parts)"
-    update_parts
+    plength="$(echo "${partinfo}" | wc -l)"
     
     # shellcheck disable=SC2086
     msg="Enter the number of the partition above that you want to use for an esp.\n\n"
