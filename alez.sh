@@ -345,7 +345,6 @@ get_parts() {
 }
 
 update_parts() {
-	partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
     mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
 }
@@ -465,6 +464,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         dialog --tailbox ${partsfile} 0 0
     fi
 
+	partinfo="$(get_parts)"
     update_parts
 
     if [ "$zpconf" == "s" ]; then
@@ -549,6 +549,7 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
         dialog --tailbox ${partsfile} 0 0
     fi
 
+	partinfo="$(get_parts)"
     update_parts
     
     # shellcheck disable=SC2086
@@ -597,6 +598,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             dialog --tailbox ${partsfile} 0 0
         fi
 
+		partinfo="$(get_disks)"
         update_parts
         
         # shellcheck disable=SC2086
