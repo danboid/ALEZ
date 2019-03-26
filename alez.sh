@@ -58,18 +58,18 @@ error_cleanup() {
 # Run stuff in the ZFS chroot install function with optional message
 chrun() {
     [[ -n "${2}" ]] && echo "${2}"
-	arch-chroot "${installdir}" /bin/bash -c "${1}"
+    arch-chroot "${installdir}" /bin/bash -c "${1}"
 }
 
 # List and enumerate attached disks function
 lsdsks() {
-	lsblk
-	echo -e "\nAttached disks : \n"
-	mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
-	ndisks=${#disks[@]}
-	for (( d=0; d<ndisks; d++ )); do
-	   echo -e "$d - ${disks[d]}\n"
-	done
+    lsblk
+    echo -e "\nAttached disks : \n"
+    mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
+    ndisks=${#disks[@]}
+    for (( d=0; d<ndisks; d++ )); do
+       echo -e "$d - ${disks[d]}\n"
+    done
 }
 
 # Used for displaying partiions
@@ -225,13 +225,13 @@ install_arch(){
 }
 
 add_grub_entry(){
-	chrun "grub-mkconfig -o /boot/grub/grub.cfg" "Create GRUB configuration"
+    chrun "grub-mkconfig -o /boot/grub/grub.cfg" "Create GRUB configuration"
     echo "Adding Arch ZFS entry to GRUB menu..."
     local kern_suffix
     kern_suffix=""
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
         kern_suffix="-lts"
-	fi
+    fi
     # shellcheck disable=SC1004
     awk -i inplace '/10_linux/ && !x {print $0; print "\
 menuentry \"Arch Linux ZFS\" {\n\
@@ -270,7 +270,7 @@ install_sdboot(){
     mkdir -p "${installdir}/${1}/loader/entries"
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
         gen_sdboot_entry "${1}" "linux-lts"
-	else
+    else
         gen_sdboot_entry "${1}" "linux"
     fi
 
@@ -299,10 +299,10 @@ check_mountdir(){
 #  - variable 'disks' - array containing all the disks found
 get_disks(){
     mapfile -t disks < <(lsblk | grep disk | awk '{print $1}')
-	ndisks=${#disks[@]}
-	for (( d=0; d<ndisks; d++ )); do
-	   echo "$d"; echo "${disks[d]}"
-	done
+    ndisks=${#disks[@]}
+    for (( d=0; d<ndisks; d++ )); do
+       echo "$d"; echo "${disks[d]}"
+    done
 }
 
 # Input:
@@ -348,7 +348,7 @@ update_parts() {
     plength="$(echo "${partinfo}" | wc -l)"
     mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
 }
-	
+
 
 # Define a multiline variable
 define() {
@@ -385,7 +385,7 @@ dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
        --msgbox "${welcome_msg}" ${HEIGHT} ${WIDTH}
 
 kernel_type=$(dialog --stdout --clear --title "Kernel type" \
-	--menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable (standard)" "l" "Longterm")
+                     --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable (standard)" "l" "Longterm")
 
 if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     bootloader=$(dialog --stdout --clear --title "UEFI bootloader" \
@@ -425,7 +425,7 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
     fi
     blkdev="/dev/$blkdev"
     free_space=$(dialog --stdout --clear --title "Should I leave free space after ZFS partition?" --inputbox "Enter unused space in MB" $HEIGHT $WIDTH "0")
-	
+
     msg="ALL data on $blkdev will be lost? Proceed?"
     if dialog --clear --title "Partition disk?" --yesno "${msg}" $HEIGHT $WIDTH; then
         msg="Shred partitions before partitioning $blkdev (slow)?"
@@ -464,7 +464,7 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         dialog --tailbox ${partsfile} 0 0
     fi
 
-	partinfo="$(get_parts)"
+    partinfo="$(get_parts)"
     update_parts
 
     if [ "$zpconf" == "s" ]; then
@@ -549,12 +549,12 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
         dialog --tailbox ${partsfile} 0 0
     fi
 
-	partinfo="$(get_parts)"
+    partinfo="$(get_parts)"
     plength="$(echo "${partinfo}" | wc -l)"
     
-    # shellcheck disable=SC2086
     msg="Enter the number of the partition above that you want to use for an esp.\n\n"
     msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
+    # shellcheck disable=SC2086
     esp=$(dialog --stdout --clear --title "Install type" \
                  --menu "$msg" \
                  $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
@@ -598,7 +598,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             dialog --tailbox ${partsfile} 0 0
         fi
 
-		partinfo="$(get_disks)"
+        partinfo="$(get_disks)"
         update_parts
         
         # shellcheck disable=SC2086
