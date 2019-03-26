@@ -554,6 +554,8 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     
     msg="Enter the number of the partition above that you want to use for an esp.\n\n"
     msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
+    # This shellcheck exception is necessary to keep the partinfo variable unquoted.
+    # Adding quotes around ${partinfo} here breaks the esp dialog command.
     # shellcheck disable=SC2086
     esp=$(dialog --stdout --clear --title "Install type" \
                  --menu "$msg" \
