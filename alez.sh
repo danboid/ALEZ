@@ -575,7 +575,14 @@ fi
 
 dialog --title "Begin install?" --msgbox "Setup complete, begin install?" ${HEIGHT} ${WIDTH}
 
-{ pacman-key -r "${archzfs_pgp_key}" --keyserver hkp://pool.sks-keyservers.net:80 && pacman-key --lsign-key "${archzfs_pgp_key}" ; } &> /dev/null
+pacman-key -r "${archzfs_pgp_key}" --keyserver hkp://pool.sks-keyservers.net:80
+
+if [[ "$?" -ne 0 ]]; then
+    dialog --title "Installation error" --msgbox "Failed to fetch archzfs key" ${HEIGHT} ${WIDTH}
+    exit 1
+fi
+
+pacman-key --lsign-key "${archzfs_pgp_key}"
 
 install_arch | dialog --progressbox 30 70
 
