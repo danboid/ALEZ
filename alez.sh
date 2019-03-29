@@ -577,6 +577,7 @@ dialog --title "Begin install?" --msgbox "Setup complete, begin install?" ${HEIG
 
 pacman-key -r "${archzfs_pgp_key}" --keyserver hkp://pool.sks-keyservers.net:80
 
+# shellcheck disable=SC2181
 if [[ "$?" -ne 0 ]]; then
     dialog --title "Installation error" --msgbox "Failed to fetch archzfs key" ${HEIGHT} ${WIDTH}
     exit 1
