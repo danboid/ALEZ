@@ -169,15 +169,20 @@ get_matching_kernel() {
     return 0
 }
 
-install_arch(){
-    echo "Installing Arch base system..."
-    pacman -Sy &> /dev/null
+refresh_mirrors() {
+    pacman -Sy --noconfirm &> /dev/null
     
     if hash reflector 2> /dev/null; then
+    {
         echo "Refreshing mirrorlist"
-        { reflector --verbose --latest 25 \
-                --sort rate --save /etc/pacman.d/mirrorlist || : ; } 2> /dev/null
+        reflector --verbose --latest 25 \
+                  --sort rate --save /etc/pacman.d/mirrorlist || :
+    } 2> /dev/null | dialog --progressbox ${HEIGHT} ${WIDTH}
     fi
+}
+
+install_arch(){
+    echo "Installing Arch base system..."
     {
         if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
             pacman -Sg base | cut -d ' ' -f 2 | sed 's/^linux$/linux-lts/g' | \
@@ -349,11 +354,31 @@ update_parts() {
     mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
 }
 
-
 # Define a multiline variable
 define() {
     # shellcheck disable=SC2086
     IFS=$'\n' read -r -d '' ${1} || : ;
+}
+
+fetch_archzfs_key() {
+    declare -a keyservers=(
+        'hkp://pool.sks-keyservers.net:80'
+        # 'hkp://pgp.mit.edu:80'                    # Replace with working keyservers
+        # 'hkp://ipv4.pool.sks-keyservers.net:80'
+    )
+
+    {
+    # Try default keyserver first
+    if pacman-key -r "${archzfs_pgp_key}"; then
+        pacman-key --lsign-key "${archzfs_pgp_key}" && return 0
+    fi
+    for ks in "${keyservers[@]}"; do
+        if pacman-key -r "${archzfs_pgp_key}" --keyserver "${ks}"; then
+            pacman-key --lsign-key "${archzfs_pgp_key}" && return 0
+        fi
+    done
+    } &> /dev/null
+    return 1
 }
 
 ## MAIN ##
@@ -575,15 +600,13 @@ fi
 
 dialog --title "Begin install?" --msgbox "Setup complete, begin install?" ${HEIGHT} ${WIDTH}
 
-pacman-key -r "${archzfs_pgp_key}" --keyserver hkp://pool.sks-keyservers.net:80
+refresh_mirrors
 
-# shellcheck disable=SC2181
-if [[ "$?" -ne 0 ]]; then
-    dialog --title "Installation error" --msgbox "Failed to fetch archzfs key" ${HEIGHT} ${WIDTH}
+if ! fetch_archzfs_key; then
+    dialog --title "Installation error" \
+        --msgbox "ERROR: Failed to fetch archzfs key" ${HEIGHT} ${WIDTH}
     exit 1
 fi
-
-pacman-key --lsign-key "${archzfs_pgp_key}"
 
 install_arch | dialog --progressbox 30 70
 
