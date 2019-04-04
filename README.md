@@ -46,6 +46,11 @@ The stable kernel is the default Linux kernel installed as part of a regular bas
 TROUBLESHOOTING
 ---------------
 
+Faulty ISO?
+-----------
+
+Travis CI auto-generates new ISOs for almost every commit made to the ALEZ repo. These auto-generated ISOs don't always fully work so before opening a issue please try installing with an older ALEZ ISO first. We will try remove ISOs known not to work.
+
 
 archzfs key import fails
 ------------------------
@@ -53,10 +58,10 @@ archzfs key import fails
 If ALEZ abruptly 'completes' near the start of the install, it could be that it failed to import the key for the archzfs repo because the archlinux-keyring PGP signatures package included on the iso is outdated. Rather than waiting for a new ISO to be uploaded you can follow the instructions in create-alez-iso.txt to create an updated ISO.
 
 
-Running ALEZ under virt-manager / qemu
-----------------------------------------
+Running ALEZ within virtual machines
+------------------------------------
 
-GRUB fails to install under VMs created using the virt-manager defaults because it defaults to using an IDE disk bus. Change your VM disk bus to VirtIO or SATA before running ALEZ.
+GRUB fails to install under VMs created using the virt-manager and virtualbox defaults because they both default to using an IDE disk bus. Change your VM disk bus or storage controller type to SATA or VirtIO before running ALEZ.
 
 
 
