@@ -39,6 +39,7 @@ deploy:
   on:
     branch: master
     condition: ${ISO_RESULT} = 0
+  draft: true
 notifications:
   email:
     on_success: change
