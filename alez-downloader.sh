@@ -1,23 +1,31 @@
 #!/bin/bash
 # ALEZ downloader
 
-# Remove and/or create temp dir for ALEZ repo
-if [ ! -e /tmp/ALEZ ]; then
-    mkdir /tmp/ALEZ
-else
-	rm -rf /tmp/ALEZ
-	mkdir /tmp/ALEZ
-fi
+# Exit on error
+set -o errexit -o errtrace
 
-echo "Downloading ALEZ..."
-git clone https://github.com/danboid/ALEZ.git /tmp/ALEZ
-if [ "$?" == 0 ]; then
-	echo "Running ALEZ"
-	/bin/bash /tmp/ALEZ/alez.sh
-	echo "Removing installer"
-	rm -rf /tmp/ALEZ
-else
-	echo -e "\nFailed to download the ALEZ installer.\n\nPlease check your internet connection and try again."
-	echo "Removing installer"
-	rm -rf /tmp/ALEZ
-fi
+alez_dir="/usr/local/share/ALEZ"
+
+# Check repo exists, if it does pull updates
+pull_updates() {    
+    if [ -d "${alez_dir}/.git" ]; then
+        echo "Updating ALEZ..."
+        pushd "${alez_dir}"
+        git fetch --depth 1
+        git reset --hard origin/master
+        popd
+    else
+        echo "Downloading ALEZ..."
+        mkdir -p "${alez_dir}"
+        if ! git clone --branch master --single-branch --depth 1 \
+            https://github.com/danboid/ALEZ.git "${alez_dir}"; then
+            printf "\n%s\n\n%s" "Failed to download the ALEZ installer." \
+                          "Please check your internet connection and try again."
+        fi
+    fi
+}
+
+pull_updates
+
+echo "Running ALEZ"
+/bin/bash "${alez_dir}/alez.sh"
