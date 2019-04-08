@@ -72,6 +72,20 @@ lsdsks() {
     done
 }
 
+update_parts() {
+    # shellcheck disable=SC2046
+    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_path} && ls /dev/vd* || : ;))
+    ptcount=${#partids[@]}
+}
+
+get_parts() {
+    # Read partitions into an array and print enumerated
+    update_parts
+    for (( p=0; p<ptcount; p++ )); do
+        echo "$p" "${partids[p]}"
+    done
+}
+
 # Used for displaying partiions
 lsparts() {
     echo -e "\nPartition layout:"
@@ -81,12 +95,10 @@ lsparts() {
     echo -e "Available partitions:\n\n"
 
     # Read partitions into an array and print enumerated, only show path if show_path=true
-    # shellcheck disable=SC2046
-    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_path} && ls /dev/disk/by-path/* || : ;))
-    ptcount=${#partids[@]}
-
+    update_parts
     for (( p=0; p<ptcount; p++ )); do
-        echo -e "$p - ${partids[p]} -> $(readlink "${partids[p]}")\n"
+        printf "%s%s\n" "${p} - ${partids[p]}" \
+               "$([[ -L "${partids[p]}" ]] && printf "%s" "-> $(readlink "${partids[p]}")" || : ;)"
     done
 }
 
@@ -324,7 +336,7 @@ dialog_menu() {
 
     for VALUE in "${ARRAY[@]}"; do
         ((COUNT++)) || true # 0++ returns 1 which trips our ERR trap
-        PARAMS+=( $COUNT "$VALUE" )
+        PARAMS+=( "${COUNT}" "${VALUE}" )
     done
 
     COUNT=$(
@@ -337,21 +349,6 @@ dialog_menu() {
         # Array is numbered from 0
         echo "${ARRAY[$COUNT-1]}"
     fi
-}
-
-get_parts() {
-    # Read partitions into an array and print enumerated
-    # shellcheck disable=SC2046
-    mapfile -t partids < <(ls /dev/disk/by-id/* $("${show_path}" && ls /dev/disk/by-path/* || : ;))
-    ptcount=${#partids[@]}
-    for (( p=0; p<ptcount; p++ )); do
-        echo "$p" "${partids[p]}"
-    done
-}
-
-update_parts() {
-    plength="$(echo "${partinfo}" | wc -l)"
-    mapfile -t partids < <(ls /dev/disk/by-id/* "$(${show_path} && ls /dev/disk/by-path/* || : ;)")
 }
 
 # Define a multiline variable
@@ -490,13 +487,12 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     fi
 
     partinfo="$(get_parts)"
-    update_parts
 
     if [ "$zpconf" == "s" ]; then
         msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
         # shellcheck disable=SC2086
         zps=$(dialog --stdout --clear --title "Choose partition" \
-                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
+                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ptcount))" ${partinfo})
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             # shellcheck disable=SC2046
             zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
@@ -508,10 +504,10 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     elif [ "$zpconf" == "m" ]; then
         # shellcheck disable=SC2086
         zp1=$(dialog --stdout --clear --title "First zpool partition" \
-                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + plength ))" ${partinfo})
+                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + ptcount ))" ${partinfo})
         # shellcheck disable=SC2086
         zp2=$(dialog --stdout --clear --title "Second zpool partition" \
-                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + plength ))" ${partinfo})
+                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + ptcount ))" ${partinfo})
 
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
@@ -575,7 +571,6 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     fi
 
     partinfo="$(get_parts)"
-    plength="$(echo "${partinfo}" | wc -l)"
     
     msg="Enter the number of the partition above that you want to use for an esp.\n\n"
     msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
@@ -584,7 +579,7 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     # shellcheck disable=SC2086
     esp=$(dialog --stdout --clear --title "Install type" \
                  --menu "$msg" \
-                 $HEIGHT $WIDTH "$(( 2 + plength))" ${partinfo})
+                 $HEIGHT $WIDTH "$(( 2 + ptcount))" ${partinfo})
 
     efi_partition="${partids[$esp]}"
     mkfs.fat -F 32 "${efi_partition}"| dialog --progressbox 10 70
@@ -637,7 +632,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
         # shellcheck disable=SC2086
         grubdisk=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition on which you want to install GRUB:" \
-                 $HEIGHT $WIDTH "${plength}" ${partinfo})
+                 ${HEIGHT} ${WIDTH} "${ptcount}" ${partinfo})
 
         install_grub "${grubdisk}" | dialog --progressbox 30 70
 
