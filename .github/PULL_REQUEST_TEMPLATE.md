@@ -9,6 +9,7 @@ been fixed. Please also include relevant motivation and context, especially if n
 
 <!--
 Describe the tests that you ran. Note any details from your test configuration.
+Fill any boxes [x] you have completed.
 -->
 
 - [ ] Tested UEFI install to successful boot
