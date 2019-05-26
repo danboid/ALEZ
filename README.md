@@ -8,7 +8,7 @@ Arch Linux Easy ZFS (ALEZ) installer
 WHAT IS ALEZ?
 -------------
 
-ALEZ (pronounced like 'ales', as in beer) is a shell script to simplify the process of installing Arch Linux using the ZFS file system.
+ALEZ (pronounced 'ales', as in beer) is a shell script to simplify the process of installing Arch Linux using the ZFS file system.
 
 ALEZ automates the processes of partitioning disks, creating and configuring a ZFS pool and some basic datasets, installing a base Arch Linux system 
 and configuring and installing the GRUB or systemd bootloader so that they all play nicely with ZFS. 
