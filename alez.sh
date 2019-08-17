@@ -218,8 +218,12 @@ get_matching_kernel() {
         pkgdir="${installdir}"
 
         mkdir -p "${pkgdir}"
-        curl --progress-bar --output "${pkgdir}/${pkg}" "${url}" && \
-            chrun "pacman -U --noconfirm /${pkg}" && rm "${pkgdir}/${pkg}"
+        {
+            pushd "${pkgdir}" && wget "${url}"  && popd
+        } &> /dev/null
+
+        chrun "pacman -U --noconfirm /${pkg}" && rm "${pkgdir}/${pkg}"
+
     fi
 
     return 0
