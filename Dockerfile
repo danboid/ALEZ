@@ -25,12 +25,8 @@ RUN sed -i '/^\[core\]/i [archzfs]\n\
 
 RUN printf 'git\narchzfs-linux\nreflector\n' >> "${ALEZ_BUILD_DIR}/iso/packages.x86_64"
 
-COPY alez-downloader.sh "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
+COPY alez.sh "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
 COPY motd "${ALEZ_BUILD_DIR}/iso/airootfs/etc/"
-
-RUN git clone --branch master --single-branch --depth 1 \
-    https://github.com/danboid/ALEZ.git \
-    ${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/share/ALEZ 
 
 RUN chmod +x "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
 
