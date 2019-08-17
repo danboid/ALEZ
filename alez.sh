@@ -39,6 +39,11 @@ zpool_bios_features=(
     'feature@userobj_accounting=disabled'
 )
 
+check_internet() {
+    ping -c 1 archlinux.org &> /dev/null || return 1
+    return 0
+}
+
 print_features() {
     # Prefix each property with '-o '
     echo "${zpool_bios_features[@]/#/-o }"
@@ -397,14 +402,22 @@ else
     system_mode=BIOS
 fi
 
+connected=1
+check_internet && connected=0
+
 define welcome_msg <<EOF
-Running in ${system_mode} mode.
-Please make sure you are connected to the Internet before running ALEZ.
+Running in ${system_mode} mode.$(
+    [ "${connected}" -eq 1 ] && printf "\n%s\n%s" \
+        "You are not connected to the internet." \
+        "Please connect to the Internet before running ALEZ."
+)
 EOF
 
 # shellcheck disable=SC2154
 dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
        --msgbox "${welcome_msg}" ${HEIGHT} ${WIDTH}
+
+[ "${connected}" -eq 1 ] && exit 1
 
 kernel_type=$(dialog --stdout --clear --title "Kernel type" \
                      --menu "Please select:" $HEIGHT $WIDTH 4 "s" "Stable (standard)" "l" "Longterm")
