@@ -1,7 +1,7 @@
 #!/bin/bash
 # shellcheck disable=SC2015
 
-# Arch Linux Easy ZFS (ALEZ) installer 1.1
+# Arch Linux Easy ZFS (ALEZ) installer 1.2
 # by Dan MacDonald with contributions from John Ramsden
 
 # Exit on error
@@ -13,7 +13,7 @@ export LANG=C
 # This is required to fix grub's "failed to get canonical path" error
 export ZPOOL_VDEV_NAME_PATH=1
 
-version=1.1
+version=1.2
 
 # Colors
 RED='\033[0;31m'
@@ -679,7 +679,7 @@ install_arch | dialog --progressbox 30 70
 if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
     chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." 2> /dev/null | dialog --progressbox 30 70
-    
+
     add_grub_entry
 
     autopart="Do you want to install GRUB onto any of the attached disks?"
