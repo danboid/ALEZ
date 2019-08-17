@@ -155,13 +155,13 @@ zap_partition(){
 bios_partitioning(){
     echo -e "GPT BIOS partitioning ${1}...\n"
     zap_partition "${1}"
-        
+
     echo "Creating BIOS boot partition"
     sgdisk --new=1:0:+2M --typecode=1:EF02 "${1}"
 
     echo "Creating system partition"
     sgdisk --new=2:0:-"${free_space}"M --typecode=2:BF00 "${1}"
-    
+
     echo "Set legacy BIOS boot flag"
     sgdisk -A 2:set:2 "${1}"
 }
@@ -198,14 +198,14 @@ get_matching_kernel() {
     kernel_version="$(pkg_ver '(?<=\s)[[:digit:]].*?(?=($|\s))' "linux${kern_suffix}")"
 
     if [[ "${zfs_depend_ver}" != "${kernel_version}" ]]; then
-       
+
         printf "%s\n%s\n" "zfs-linux${kern_suffix} package is out of sync with linux${kern_suffix}." \
             "Downloading kernel ${kernel_version} from archive"
 
         # Get package list
         ala="https://archive.archlinux.org/packages"
         kern_match="$(curl --silent "${ala}/.all/index.0.xz" | unxz | grep -P "linux${kern_suffix}-${zfs_depend_ver}")"
-        
+
         echo "Found ${kern_match} in Arch Linux Archive"
 
         if [[ -z ${kern_match} ]]; then
@@ -227,7 +227,7 @@ get_matching_kernel() {
 
 refresh_mirrors() {
     pacman -Sy --noconfirm &> /dev/null
-    
+
     if hash reflector 2> /dev/null; then
     {
         echo "Refreshing mirrorlist"
@@ -263,7 +263,7 @@ install_arch(){
 
     echo "Add Arch ZFS pacman repo..."
     echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> "${installdir}/etc/pacman.conf"
-    
+
     echo -e "Export ZPOOL_VDEV_NAME_PATH\n"
     echo -e "\nexport ZPOOL_VDEV_NAME_PATH=1" >> "${installdir}/etc/profile"
 
@@ -313,7 +313,7 @@ install_grub_efi(){
 
         # Install GRUB EFI
         chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" \
-            "Installing grub-efi to ${1}" 
+            "Installing grub-efi to ${1}"
     } 2> /dev/null
 }
 
@@ -635,7 +635,7 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
     fi
 
     partinfo="$(get_parts)"
-    
+
     msg="Enter the number of the partition above that you want to use for an esp.\n\n"
     msg+="If you used alez to create your partitions,\nyou likely want the one ending with -part1"
     # This shellcheck exception is necessary to keep the partinfo variable unquoted.
@@ -692,7 +692,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
         partinfo="$(get_disks)"
         update_parts
-        
+
         # shellcheck disable=SC2086
         grubdisk=$(dialog --stdout --clear --title "Install type" \
                  --menu "Enter the number of the partition on which you want to install GRUB:" \
