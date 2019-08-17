@@ -9,6 +9,7 @@ services:
 script:
   - shellcheck alez.sh
 after_success:
+  - git fetch --tags
   - ISO_VER="$(date +"%Y.%m.%d.%H.%M.%S")"
   - export ALEZ_ISO_REL="${ALEZ_ISO_PREFIX}-${ISO_VER}"
   - docker build -t "$DOCKER_TAG" ./

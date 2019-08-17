@@ -23,12 +23,16 @@ RUN sed -i '/^\[core\]/i [archzfs]\n\
             Server = http://archzfs.com/$repo/x86_64\n' \
     "${ALEZ_BUILD_DIR}/iso/pacman.conf"
 
-RUN printf 'git\narchzfs-linux\nreflector\n' >> "${ALEZ_BUILD_DIR}/iso/packages.x86_64"
+RUN printf 'git\narchzfs-linux\nreflector\nwget\n' >> "${ALEZ_BUILD_DIR}/iso/packages.x86_64"
 
-COPY alez.sh "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
 COPY motd "${ALEZ_BUILD_DIR}/iso/airootfs/etc/"
 
-RUN chmod +x "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
+# Copy in current directory to allow git tag checking
+COPY . "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/share/ALEZ"
+
+RUN chmod +x "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/share/ALEZ/alez.sh"
+
+RUN ln -s "/usr/local/share/ALEZ/alez.sh" "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
 
 VOLUME "${ALEZ_BUILD_DIR}/iso/out"
 

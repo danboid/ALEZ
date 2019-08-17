@@ -23,6 +23,9 @@ installdir="/mnt"
 archzfs_pgp_key="F75D9D76"
 zroot="zroot"
 
+repo_directory="/usr/local/share/ALEZ"
+repo_remote="danboid/ALEZ"
+
 HEIGHT=0
 WIDTH=0
 
@@ -38,6 +41,30 @@ zpool_bios_features=(
     'feature@edonr=disabled'
     'feature@userobj_accounting=disabled'
 )
+
+check_latest() {
+    # If repo doesn't exist, skip check
+    [ -d "${repo_directory}" ] || return 0
+
+    local tag remote_tag
+
+    tag=$(
+        cd "${repo_directory}" && \
+        git describe --tags "$(git rev-list --tags --max-count=1)" || true
+    )
+
+    remote_tag="$(curl --silent \
+        "https://api.github.com/repos/${repo_remote}/releases/latest" | \
+        grep -Po '"tag_name": "\K.*?(?=")' || true
+    )"
+
+    # Dont fail, if check fails skip message
+    if [ -n "${tag}" ] && [ -n "${tag}" ]; then
+        [ "${remote_tag}" != "${tag}" ] && echo "${remote_tag}"
+    fi
+
+    return 0
+}
 
 check_internet() {
     ping -c 1 archlinux.org &> /dev/null || return 1
@@ -417,6 +444,8 @@ fi
 connected=1
 check_internet && connected=0
 
+remote_tag="$(check_latest)"
+
 define welcome_msg <<EOF
 Running in ${system_mode} mode.$(
     [ "${connected}" -eq 1 ] && printf "\n%s\n%s" \
@@ -428,6 +457,16 @@ EOF
 # shellcheck disable=SC2154
 dialog --title "The Arch Linux Easy ZFS (ALEZ) installer v${version}" \
        --msgbox "${welcome_msg}" ${HEIGHT} ${WIDTH}
+
+if [ -n "${remote_tag}" ]; then
+    define release_msg <<EOF
+A newer release of ALEZ is available.
+${remote_tag}
+EOF
+
+    # shellcheck disable=SC2154
+    dialog --title "New release available" --msgbox "${release_msg}" ${HEIGHT} ${WIDTH}
+fi
 
 [ "${connected}" -eq 1 ] && exit 1
 
