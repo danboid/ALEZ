@@ -56,6 +56,18 @@ unmount_cleanup() {
     } &> /dev/null
 }
 
+bootloader_message() {
+    if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
+        echo "mount -t zfs '${zroot}/boot/grub' '${installdir}/boot/grub'"
+    else
+        echo "mount '${efi_partition}' '${installdir}${esp_mountpoint}'"
+
+        if [[ "${bootloader}" =~ ^(s|S)$ ]]; then
+            echo "mount --bind '${installdir}${esp_mountpoint}/env/zedenv-default' '${installdir}/boot'"
+        fi
+    fi
+}
+
 error_cleanup() {
     echo -e "${RED}WARNING:${NC} Error occurred. Unmounted datasets and exported ${zroot}"
 }
@@ -672,22 +684,28 @@ fi
 } 2> /dev/null | dialog --progressbox 30 70
 
 unmount_cleanup
-dialog --programbox 25 70 <<EOT
-Installation complete. You may now reboot into your new install.
 
-If you want to mount the newly installed system and install more
-packages you can do so via:
+clear
 
-zpool import -R /mnt ${zroot}
-chroot /mnt bash
+# shellcheck disable=SC2091
+cat <<EOT
+# Installation complete. You may now reboot into your new install.
+
+# If you want to mount the newly installed system and install more
+# packages you can do so via:
+
+# Mount datasets and partitions
+zpool import -R '${installdir}' '${zroot}'
+$(bootloader_message)
+
+# Enter chroot
+arch-chroot '${installdir}'
 
   # inside chroot
-  mount -t proc none /proc
-  echo "nameserver 8.8.8.8" > /etc/resolv.conf
   pacman -S ....
-  umount /proc
   exit
 
 # back out of chroot
-zpool export ${zroot}
+umount -R '${installdir}'
+zfs umount -a && zpool export '${zroot}'
 EOT
