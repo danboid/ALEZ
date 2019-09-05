@@ -268,7 +268,7 @@ install_arch(){
     ) > "${installdir}/etc/fstab"
 
     echo "Add Arch ZFS pacman repo..."
-    echo -e "\n[archzfs]\nServer = http://archzfs.com/\$repo/x86_64" >> "${installdir}/etc/pacman.conf"
+    echo -e "\n[archzfs]\nServer = https://archzfs.com/\$repo/x86_64" >> "${installdir}/etc/pacman.conf"
 
     echo -e "Export ZPOOL_VDEV_NAME_PATH\n"
     echo -e "\nexport ZPOOL_VDEV_NAME_PATH=1" >> "${installdir}/etc/profile"
