@@ -200,7 +200,7 @@ get_matching_kernel() {
     if [[ "${zfs_depend_ver}" != "${kernel_version}" ]]; then
 
         printf "%s\n%s\n" "zfs-linux${kern_suffix} package is out of sync with linux${kern_suffix}." \
-            "Downloading kernel ${kernel_version} from archive"
+            "Downloading kernel ${zfs_depend_ver} from archive"
 
         # Get package list
         ala="https://archive.archlinux.org/packages"
