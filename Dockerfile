@@ -23,7 +23,11 @@ RUN sed -i '/^\[core\]/i [archzfs]\n\
             Server = http://archzfs.com/$repo/x86_64\n' \
     "${ALEZ_BUILD_DIR}/iso/pacman.conf"
 
-RUN printf 'git\narchzfs-linux\nreflector\nwget\n' >> "${ALEZ_BUILD_DIR}/iso/packages.x86_64"
+RUN printf 'git\narchzfs-linux\nreflector\nwget\nlinux\nlinux-firmware\ndhcpcd\nless\nmdadm' >> \
+           "${ALEZ_BUILD_DIR}/iso/packages.x86_64"
+
+RUN printf '\nsystemctl enable dhcpcd' >> \
+           "${ALEZ_BUILD_DIR}/iso/airootfs/root/customize_airootfs.sh"
 
 COPY motd "${ALEZ_BUILD_DIR}/iso/airootfs/etc/"
 

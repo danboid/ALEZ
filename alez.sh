@@ -31,6 +31,11 @@ WIDTH=0
 
 show_path=false
 
+declare -a base_packages
+base_packages=(
+    'base' 'nano' 'linux-firmware' 'man-db' 'man-pages' 'vi' 'less'
+)
+
 declare -a zpool_bios_features
 zpool_bios_features=(
     'feature@lz4_compress=enabled'
@@ -245,10 +250,10 @@ install_arch(){
     echo "Installing Arch base system..."
     {
         if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
-            pacman -Sg base | cut -d ' ' -f 2 | sed 's/^linux$/linux-lts/g' | \
-                    pacstrap "${installdir}" - linux-lts-headers
+            pacstrap "${installdir}" linux-lts-headers linux-lts \
+                                     "${base_packages[@]}"
         else
-            pacstrap "${installdir}" base linux-headers
+            pacstrap "${installdir}" linux-headers linux "${base_packages[@]}"
         fi
     } 2> /dev/null
 
