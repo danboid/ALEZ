@@ -135,6 +135,14 @@ get_parts() {
     done
 }
 
+get_parts_checklist() {
+    # Read partitions into an array and print enumerated, unselected by default (off)
+    update_parts
+    for (( p=0; p<ptcount; p++ )); do
+        echo "$p" "${partids[p]}" "off"
+    done
+}
+
 # Used for displaying partiions
 lsparts() {
     echo -e "\nPartition layout:"
@@ -549,59 +557,95 @@ while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
 done
 
 # Create zpool
-msg="Do you want to create a new zpool?"
-while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
-    zpconf=$(dialog --stdout --clear --title "Install type" \
-                    --menu "Single disc, or mirrored zpool?" $HEIGHT $WIDTH 4 "s" "Single disc" "m" "Mirrored")
+zpoptions="-f -d -m none -o ashift=12 -O atime=off -O compression=on -O acltype=posixacl"
+if [[ "${install_type}" =~ ^(b|B)$ ]]; then
+    # shellcheck disable=SC2046
+    zpoptions="${zpoptions} $(print_features)"
+fi
 
-    if dialog --clear --title "Disk layout" --yesno "View partition layout?" $HEIGHT $WIDTH; then
-        partsfile="$(mktemp)"
-        lsparts > "${partsfile}"
-        # shellcheck disable=SC2086
-        dialog --tailbox ${partsfile} 0 0
-    fi
+if dialog --clear --title "Disk layout" --yesno "View partition layout?" $HEIGHT $WIDTH; then
+    partsfile="$(mktemp)"
+    lsparts > "${partsfile}"
+    # shellcheck disable=SC2086
+    dialog --tailbox ${partsfile} 0 0
+fi
 
-    partinfo="$(get_parts)"
-
-    if [ "$zpconf" == "s" ]; then
-        msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
-        # shellcheck disable=SC2086
-        zps=$(dialog --stdout --clear --title "Choose partition" \
-                     --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ptcount))" ${partinfo})
-        if [[ "${install_type}" =~ ^(b|B)$ ]]; then
-            # shellcheck disable=SC2046
-            zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
-        else
-            zpool create -f -d -m none -o ashift=12 "${zroot}" "${partids[$zps]}"
-        fi
-        dialog --title "Success" --msgbox "Created a single disk zpool with ${partids[$zps]}...." ${HEIGHT} ${WIDTH}
-        break
-    elif [ "$zpconf" == "m" ]; then
-        # shellcheck disable=SC2086
-        zp1=$(dialog --stdout --clear --title "First zpool partition" \
-                     --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + ptcount ))" ${partinfo})
-        # shellcheck disable=SC2086
-        zp2=$(dialog --stdout --clear --title "Second zpool partition" \
-                     --menu "Select the number of the second partition" $HEIGHT $WIDTH "$(( 2 + ptcount ))" ${partinfo})
-
-        echo "Creating a mirrored zpool..."
-        if [[ "${install_type}" =~ ^(b|B)$ ]]; then
-            # shellcheck disable=SC2046
-            zpool create "${zroot}" mirror -f -d -m none \
-                -o ashift=12 \
-                $(print_features) "${partids[$zp1]}" "${partids[$zp2]}"
-        else
-            zpool create "${zroot}" mirror -f -d -m none -o ashift=12 "${partids[$zp1]}" "${partids[$zp2]}"
-        fi
-        dialog --title "Success" --msgbox "Created a mirrored zpool with ${partids[$zp1]} ${partids[$zp2]}...." ${HEIGHT} ${WIDTH}
-        break
-    fi
+partinfo="$(get_parts_checklist)"
+msg="Select all the partitions for your root using [space].\n\nIf you used alez to create your partitions,\nyou likely want the one(s) ending with -part2"
+nparts=0
+while [ "$nparts" == "0" ]; do
+    # shellcheck disable=SC2086
+    zps=$(dialog --stdout --clear --title "Choose partition" \
+                    --checklist "${msg}" $HEIGHT $WIDTH "$(( 5 + ptcount))" ${partinfo})
+    nparts=${#zps[@]}
 done
+parts=
+for (( p=0; p<nparts; p++ )); do
+    parts+="${partids[$zps[$p]]} "
+done
+if [ $nparts -gt 3 ]; then
+    zpconf=$(dialog --stdout --clear --title "Zpool configuration" \
+                     --menu "Select a zpool configuration:" $HEIGHT $WIDTH 4 \
+                     "mirror" "Mirror" "raidz1" "RaidZ1" "raidz2" "RaidZ2" "raidz3" "RaidZ3")
+elif [ $nparts -gt 2 ]; then
+    zpconf=$(dialog --stdout --clear --title "Zpool configuration" \
+                     --menu "Select a zpool configuration:" $HEIGHT $WIDTH 4 \
+                     "mirror" "Mirror" "raidz1" "RaidZ1" "raidz2" "RaidZ2")
+elif [ $nparts -gt 1 ]; then
+    zpconf=$(dialog --stdout --clear --title "Zpool configuration" \
+                     --menu "Select a zpool configuration:" $HEIGHT $WIDTH 4 \
+                     "mirror" "Mirror" "raidz1" "RaidZ1")
+fi
+# for nparts = 1, zpconf is single disk so it is empty
+zpool create "${zpoptions}" "${zroot}" "${zpconf}" "${parts}"
+dialog --title "Success" --msgbox "Created a ${zpconf} disk zpool with ${parts}" ${HEIGHT} ${WIDTH}
+
+encryption=$(dialog --stdout --clear --title "ZFS native encryption" \
+                --menu "Encrypt root?" $HEIGHT $WIDTH 5 \
+                "n" "No" "p" "With password" "k" "With keyfile")
+# TODO support both passphrase and keyfile
+# TODO select datasets to encrypt
+if [ "$encryption" == "p" ]; then
+    # TODO get passphrase here and pass it as an option
+    zfsoptions="-o encryption=aes-256-gcm -o keyformat=passphrase -o keylocation=prompt"
+elif [ "$encryption" = "k" ]; then
+    keytype=$(dialog --stdout --clear --title "Key type" \
+                    --menu "Generate or use an existing key?" $HEIGHT $WIDTH 5 \
+                    "g" "Generate new key" \
+                    "e" "Use existing key")
+    keyformat=$(dialog --stdout --clear --title "Key format" \
+                    --menu "Choose the format of the key file" $HEIGHT $WIDTH 5 \
+                    "raw" "raw" \
+                    "hex" "HEX")
+    if [ "$keytype" == "g" ]; then
+        keydir=$(dialog --stdout --clear --title "Key location" \
+                    --menu "Enter the directory path to store the key file" $HEIGHT $WIDTH)
+        mkdir -p "$keydir"
+        keypath="$keydir/keyfile"
+        if [ "$keyformat" == "raw" ]; then
+            openssl rand -out "$keypath" 32
+        elif [ "$keyformat" == "hex" ]; then
+            openssl rand -hex -out "$keypath" 32
+        fi
+    elif [ "$keytype" == "e" ]; then
+        while [ 1 ]; do
+            keypath=$(dialog --stdout --clear --title "Key location" \
+                    --menu "Enter the path of your key file" $HEIGHT $WIDTH)
+            if [ ! -f "$keypath" ]; then
+                echo "Key file at $keypath does not exist"
+                sleep 1
+                continue
+            fi
+            break
+        done
+    fi
+    zfsoptions="-o encryption=aes-256-gcm -o keysource=$keyformat,file://$keypath"
+fi
 
 {
     echo "Creating datasets..."
-    zfs create -o mountpoint=none "${zroot}"/ROOT
-    zfs create -o mountpoint=none "${zroot}"/data
+    zfs create -o mountpoint=none "${zfsoptions}" "${zroot}"/ROOT
+    zfs create -o mountpoint=none "${zfsoptions}" "${zroot}"/data
     zfs create -o mountpoint=legacy "${zroot}"/data/home
 
     { zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
@@ -616,10 +660,7 @@ done
     zfs umount -a
 
     echo "Setting ZFS properties..."
-    zfs set atime=off "${zroot}"
-    zfs set compression=on "${zroot}"
-    zfs set acltype=posixacl "${zroot}"
-    zpool set bootfs="${zroot}"/ROOT/default "${zroot}"
+    zpool set bootfs="${zroot}"/ROOT/default "${zroot}" # TODO set at creation
 
     check_mountdir
 
@@ -691,7 +732,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
     declare -a aflags=(--clear --title 'Install GRUB' --yesno)
     while dialog "${aflags[@]}" "${autopart}" $HEIGHT $WIDTH; do
 
-        msg="NOTE: If you have installed Arch onto a mirrored pool then you should install GRUB onto both disks\n"
+        msg="NOTE: If you have installed Arch onto a mirrored pool then you should install GRUB onto all disks\n"
         dialog --title "Install GRUB" --msgbox "${msg}" ${HEIGHT} ${WIDTH}
 
         if dialog --clear --title "Disk layout" --yesno "View partition layout before GRUB install?" $HEIGHT $WIDTH; then
@@ -710,7 +751,7 @@ if [[ "${install_type}" =~ ^(b|B)$ ]]; then
                  ${HEIGHT} ${WIDTH} "${ptcount}" ${partinfo})
 
         install_grub "${grubdisk}" | dialog --progressbox 30 70
-
+        # TODO install on all parts automatically
         autopart="Do you want to select another drive to install GRUB onto?"
         declare -a aflags=(--clear --title 'Install GRUB' --defaultno --yesno)
     done
