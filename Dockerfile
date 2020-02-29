@@ -23,7 +23,7 @@ RUN sed -i '/^\[core\]/i [archzfs]\n\
             Server = http://archzfs.com/$repo/x86_64\n' \
     "${ALEZ_BUILD_DIR}/iso/pacman.conf"
 
-RUN printf 'git\narchzfs-linux\nreflector\nwget\nlinux\nlinux-firmware\ndhcpcd\nless\nmdadm' >> \
+RUN printf 'git\nzfs-linux-lts\nreflector\nwget\nlinux-lts\nlinux-firmware\ndhcpcd\nless\nmdadm' >> \
            "${ALEZ_BUILD_DIR}/iso/packages.x86_64"
 
 RUN printf '\nsystemctl enable dhcpcd' >> \
