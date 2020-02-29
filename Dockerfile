@@ -29,22 +29,6 @@ RUN printf 'git\narchzfs-linux\nreflector\nwget\nlinux\nlinux-firmware\ndhcpcd\n
 RUN printf '\nsystemctl enable dhcpcd' >> \
            "${ALEZ_BUILD_DIR}/iso/airootfs/root/customize_airootfs.sh"
 
-## In case of kernel mismatch ##
-
-RUN mkdir -p "${ALEZ_BUILD_DIR}/iso/airootfs/root/customrepo/x86_64" && \
-    cd "${ALEZ_BUILD_DIR}/iso/airootfs/root/customrepo/x86_64" && \
-    wget "https://archive.archlinux.org/packages/l/linux/linux-5.4.15.arch1-1-x86_64.pkg.tar.zst" && \
-    repo-add "${ALEZ_BUILD_DIR}/iso/airootfs/root/customrepo/x86_64/customrepo.db.tar.gz" "${ALEZ_BUILD_DIR}/iso/airootfs/root/customrepo/x86_64/linux-5.4.15.arch1-1-x86_64.pkg.tar.zst"
-
-RUN sed -i '/^\[core\]/i [customrepo]\n\
-            SigLevel = Optional TrustAll\n\
-            Server = file:///opt/alez/iso/airootfs/root/customrepo/$arch\n' \
-    "${ALEZ_BUILD_DIR}/iso/pacman.conf"
-
-RUN pacman -Syy
-
-## ##
-
 COPY motd "${ALEZ_BUILD_DIR}/iso/airootfs/etc/"
 
 # Copy in current directory to allow git tag checking
