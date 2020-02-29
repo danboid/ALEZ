@@ -7,7 +7,7 @@ RUN pacman -Syu --noconfirm --needed base base-devel git archiso reflector curl
 
 RUN mkdir ~/.gnupg && echo "disable-ipv6" >> ~/.gnupg/dirmngr.conf
 RUN pacman-key --init && pacman-key --populate archlinux && \
-    pacman-key -r "${ARCHZFS_KEY}" --keyserver hkp://pool.sks-keyservers.net:80 && pacman-key --lsign-key "${ARCHZFS_KEY}"
+    if ! pacman-key -r "${ARCHZFS_KEY}"; then pacman-key -r "${ARCHZFS_KEY}" --keyserver hkp://pool.sks-keyservers.net:80; fi && pacman-key --lsign-key "${ARCHZFS_KEY}"
 
 RUN mkdir -p "${ALEZ_BUILD_DIR}" && \
     cp -r /usr/share/archiso/configs/releng "${ALEZ_BUILD_DIR}/iso" && \
