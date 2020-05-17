@@ -697,13 +697,13 @@ if ! init_keyring; then
     exit 1
 fi
 
-refresh_mirrors
-
 if ! fetch_archzfs_key; then
     dialog --title "Installation error" \
         --msgbox "ERROR: Failed to fetch archzfs key" ${HEIGHT} ${WIDTH}
     exit 1
 fi
+
+refresh_mirrors
 
 install_arch | dialog --progressbox 30 70
 
