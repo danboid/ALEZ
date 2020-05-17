@@ -433,6 +433,27 @@ fetch_archzfs_key() {
     return 1
 }
 
+init_keyring() {
+    declare -a keyservers=(
+        'hkp://pool.sks-keyservers.net:80'
+        # 'hkp://pgp.mit.edu:80'                    # Replace with working keyservers
+        # 'hkp://ipv4.pool.sks-keyservers.net:80'
+    )
+
+    pacman-key --init &> /dev/null
+
+    {
+    # Try default keyserver first
+    pacman-key --refresh-keys && return 0
+    for ks in "${keyservers[@]}"; do
+        pacman-key --refresh-keys --keyserver "${ks}" && return 0
+    done
+    } &>/dev/null
+
+    return 1
+}
+
+
 ## MAIN ##
 
 trap error_cleanup ERR     # Run on error
@@ -669,6 +690,12 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
 fi
 
 dialog --title "Begin install?" --msgbox "Setup complete, begin install?" ${HEIGHT} ${WIDTH}
+
+if ! init_keyring; then
+    dialog --title "Installation error" \
+        --msgbox "ERROR: Failed to initialize keyring" ${HEIGHT} ${WIDTH}
+    exit 1
+fi
 
 refresh_mirrors
 
