@@ -26,9 +26,6 @@ RUN sed -i '/^\[core\]/i [archzfs]\n\
 RUN printf 'git\narchzfs-linux\nreflector\nwget\nlinux\nlinux-firmware\ndhcpcd\nless\nmdadm' >> \
            "${ALEZ_BUILD_DIR}/iso/packages.x86_64"
 
-RUN printf '\nsystemctl enable dhcpcd' >> \
-           "${ALEZ_BUILD_DIR}/iso/airootfs/root/customize_airootfs.sh"
-
 COPY motd "${ALEZ_BUILD_DIR}/iso/airootfs/etc/"
 
 # Copy in current directory to allow git tag checking
