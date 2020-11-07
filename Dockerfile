@@ -41,4 +41,4 @@ RUN sed -i '\;cp\ \"\${work_dir}/x86_64/airootfs/usr/share/licenses/amd-ucode/LI
 VOLUME "${ALEZ_BUILD_DIR}/iso/out"
 
 WORKDIR "${ALEZ_BUILD_DIR}/iso"
-CMD ["./build.sh", "-v"]
+CMD ["/usr/bin/mkarchiso"]
