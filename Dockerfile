@@ -1,4 +1,4 @@
-FROM archlinux/base
+FROM archlinux:base
 
 ARG ALEZ_BUILD_DIR='/opt/alez'
 ARG ARCHZFS_KEY='F75D9D76'
@@ -31,12 +31,7 @@ COPY motd "${ALEZ_BUILD_DIR}/iso/airootfs/etc/"
 # Copy in current directory to allow git tag checking
 COPY . "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/share/ALEZ"
 
-RUN chmod +x "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/share/ALEZ/alez.sh"
-
 RUN ln -s "/usr/local/share/ALEZ/alez.sh" "${ALEZ_BUILD_DIR}/iso/airootfs/usr/local/bin/alez"
-
-RUN sed -i '\;cp\ \"\${work_dir}/x86_64/airootfs/usr/share/licenses/amd-ucode/LICENSE\";d' "${ALEZ_BUILD_DIR}/iso/build.sh" && \
-    sed -i '\;\"\${work_dir}/iso/${install_dir}/boot/amd_ucode.LICENSE\";d' "${ALEZ_BUILD_DIR}/iso/build.sh"
 
 VOLUME "${ALEZ_BUILD_DIR}/iso/out"
 
