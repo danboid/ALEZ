@@ -1,0 +1,8 @@
+# prereqs: qemu edk2-ovmf docker
+# also make sure you have VT-x emulation on if you're running this inside a VM
+
+docker build -t aleztest .
+
+docker run -it --rm --privileged -v $(realpath ./iso_out):/opt/alez/iso/out aleztest
+
+./run_archiso -u -i ./iso_out/archlinux-*.iso
