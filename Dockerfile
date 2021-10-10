@@ -36,4 +36,4 @@ RUN ln -s "/usr/local/share/ALEZ/alez.sh" "${ALEZ_BUILD_DIR}/iso/airootfs/usr/lo
 VOLUME "${ALEZ_BUILD_DIR}/iso/out"
 
 WORKDIR "${ALEZ_BUILD_DIR}/iso"
-CMD ["/usr/bin/mkarchiso"]
+CMD ["/usr/bin/mkarchiso", "./"]
