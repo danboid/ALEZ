@@ -296,7 +296,7 @@ install_arch(){
     } 2>"${IO_NULL}"
 
     chrun "if ! pacman-key -r F75D9D76; then
-               pacman-key -r F75D9D76 --keyserver hkp://pool.sks-keyservers.net:80;
+               pacman-key -r F75D9D76 --keyserver hkps://keyserver.ubuntu.com;
            fi && pacman-key --lsign-key F75D9D76" \
         "Adding Arch ZFS repo key in chroot..." 2>"${IO_NULL}"
 
@@ -452,8 +452,11 @@ define() {
 
 fetch_archzfs_key() {
     declare -a keyservers=(
-        'hkp://pool.sks-keyservers.net:80'
-        # 'hkp://pgp.mit.edu:80'                    # Replace with working keyservers
+        'hkps://keyserver.ubuntu.com'
+        'hkps://pgp.mit.edu'
+        'hkp://pgp.mit.edu:80'
+        # SKS keyservers are permanently down due to GDPR filings
+        # 'hkp://pool.sks-keyservers.net:80'
         # 'hkp://ipv4.pool.sks-keyservers.net:80'
     )
 
