@@ -12,7 +12,8 @@
 # - edk2-ovmf (when UEFI booting)
 
 
-set -eu
+# set -eu
+set -o errexit -o errtrace -o pipefail -o nounset
 
 print_help() {
     local usagetext
@@ -30,6 +31,7 @@ Options:
     -u              set boot type to 'UEFI'
     -v              use VNC display (instead of default SDL)
     -c [image]      attach an additional optical disc image (e.g. for cloud-init)
+    -x [diskpath]   attach an extra virtual hard disk
 
 Example:
     Run an image using UEFI:
@@ -117,6 +119,7 @@ run_image() {
 
 image=''
 oddimage=''
+extradisk=''
 accessibility=''
 boot_type='bios'
 mediatype='cdrom'
@@ -127,7 +130,7 @@ working_dir="$(mktemp -dt run_archiso.XXXXXXXXXX)"
 trap cleanup_working_dir EXIT
 
 if (( ${#@} > 0 )); then
-    while getopts 'abc:dhi:suv' flag; do
+    while getopts 'abc:dhi:suvx:' flag; do
         case "$flag" in
             a)
                 accessibility='on'
@@ -157,6 +160,10 @@ if (( ${#@} > 0 )); then
             v)
                 display='none'
                 qemu_options+=(-vnc 'vnc=0.0.0.0:0,vnc=[::]:0')
+                ;;
+            x)
+                extradisk="$OPTARG"
+                qemu_options+=('-drive' "file=$extradisk,if=virtio,aio=native,media=disk,cache.direct=on")
                 ;;
             *)
                 printf '%s\n' "Error: Wrong option. Try 'run_archiso -h'."

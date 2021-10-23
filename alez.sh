@@ -5,7 +5,10 @@
 # by Dan MacDonald with contributions from John Ramsden
 
 # Exit on error
-set -o errexit -o errtrace
+set -o errexit -o errtrace -o pipefail -o nounset
+# Restrict internal field separator
+IFS=$'\n\t'
+
 
 # Set a default locale during install to avoid mandb error when indexing man pages
 export LANG=C
@@ -72,14 +75,14 @@ IO_ERR=$STDERR
 IO_NULL=$DEVNULL
 # redirect all IO output to stdout in debug or test env mode
 PROD=$true
-if [ $DEBUG ] || [ $TEST ]; then
+if [ ${DEBUG:-} ] || [ ${TEST:-} ]; then
   PROD=$false
 fi
 
 if [ ! $PROD ]; then
   IO_OUT=$STDOUT
-  IO_ERR=$STDOUT
-  IO_NULL=$STDOUT
+  IO_ERR=$STDERR
+  IO_NULL=$STDERR
 fi
 
 # Echo to standard error if not in prod, otherwise do nothing (useful for debugging)

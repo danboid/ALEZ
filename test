@@ -1,8 +1,50 @@
+#!/usr/bin/env bash
+
+# this script follows unofficial bash strict mode: http://redsymbol.net/articles/unofficial-bash-strict-mode/
 # prereqs: qemu edk2-ovmf docker
 # also make sure you have VT-x emulation on if you're running this inside a VM
 
-docker build -t aleztest .
+# Exit on error
+set -o errexit -o errtrace -o pipefail -o nounset
+# Restrict internal field separator
+IFS=$'\n\t'
 
-docker run -it --rm --privileged -v $(realpath ./iso_out):/opt/alez/iso/out aleztest
+testimagepath="./testdata/test.img"
 
-./run_archiso -u -i ./iso_out/archlinux-*.iso
+# remove all built iso files unless PRESERVE is set
+[ ${PRESERVE:-} ] || {
+    echo "Removing existing ISO's..."
+    [ -f ./iso_out/*.iso ] && rm -v ./iso_out/*.iso
+}
+
+[ ${SKIP_REBUILD:-} ] || {
+    echo "Building ALEZ docker image..."
+    docker build -t aleztest .
+}
+
+# rebuild a new iso unless PRESERVE is set
+[ ${PRESERVE:-} ] || {
+    echo "Building ISO..."
+    docker run -it --rm --privileged -v $(realpath ./iso_out):/opt/alez/iso/out aleztest
+}
+
+# create a virtual drive to attach to qemu to test/dev if it doesn't already exist
+[ -d "./testdata" ] || mkdir -p ./testdata
+[ -f "$testimagepath" ] || {
+    echo "Creating virtual drive image for qemu VM at ${testimagepath}..."
+    qemu-img create -f qcow2 $testimagepath 10G
+}
+
+echo "Firing up qemu VM using ISO as boot..."
+./run_archiso -u -x $testimagepath -i ./iso_out/archlinux-*.iso
+
+# cleanup; remove the virtual drive
+# only runs if the command above was successful
+[ $? ] && {
+    echo "VM exited successfully; removing virtual drive at ${testimagepath}..."
+    rm $testimagepath
+}
+
+# if there wasn't a failure before now, then exit 0, or else the exit code of the above command would be the exit code
+# (see the end of the unofficial bash strict mode article for explanation)
+exit 0
