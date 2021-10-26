@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+
+# Tinytestlib:
+# Because all the other solutions I found to do basic bash shell script testing were too large.
+
+# Exit on error
+set -o errexit -o errtrace -o pipefail -o nounset
+
+# Captures stdout, stderr and return code of any command into the named variables.
+capture () {
+  local _out_var _out _err_var _err _ret_var _ret debugflag
+  debugflag=
+  if [ "$1" = "--debug" ]; then
+    debugflag=1
+    shift
+  fi
+  if [ "$#" -lt 4 ]; then
+      echo "Usage: capture [--debug] <stdoutvarname> <stderrvarname> <returncodevarname> command [arg ...]"
+      return 1
+  fi
+  _out_var="$1"; shift
+  _err_var="$1"; shift
+  _ret_var="$1"; shift
+  # just a modification of some nutso magic I found online that captures stdout into $_out, stderr into $_err and return/status code into $_ret
+  # WITHOUT opening files, because touching the filesystem unnecessarily is sad (slows down tests, etc)
+  . <({ _err=$({ _out=$("$@"); _ret=$?; } 2>&1; declare -p _out _ret >&2); declare -p _err; } 2>&1)
+  if [ $debugflag ]; then
+    echo "cmd: $@"
+    echo "out: $_out"
+    echo "err: $_err"
+    echo "ret: $_ret"
+  fi
+  read $_out_var <<<$(printf "%b" "$_out")
+  read $_err_var <<<$(printf "%b" "$_err")
+  read $_ret_var <<<$(printf "%b" "$_ret")
+}
+
+red_text () {
+  echo -en "\e[31m${1}\e[0m"
+}
+
+green_text () {
+  echo -en "\e[32m${1}\e[0m"
+}
+
+hex_encode () {
+  printf "%b" "$*" | hexdump -ve '/1 "%02x"'
+}
+
+hex_decode () {
+  printf "%b" "$*" | xxd -r -p
+}
+
+_assert_equality_or_lack_thereof () {
+  local comp_op arg1_enc arg2_enc
+  comp_op="$1"
+  shift
+  # to tapdance around escaping issues, I just encode to hex and compare those.
+  # This may or may not be necessary anymore, but it fixed issues in the past
+  # Wish it didn't have to fire up a subshell though; future tweak?
+  arg1_enc=$(hex_encode $1)
+  arg2_enc=$(hex_encode $2)
+  if [ "$arg1_enc" $comp_op "$arg2_enc" ]; then
+    green_text "."
+    return 0
+  else
+    red_text "F"
+    red_text "assert_equal failure: values <$1> and <$2> do not match" >&2
+    echo "" >&2
+    return 1
+  fi
+}
+assert_equal () {
+  _assert_equality_or_lack_thereof "==" "$1" "$2"
+}
+assert_not_equal () {
+  _assert_equality_or_lack_thereof "!=" "$1" "$2"
+}
+
+# Who tests the testers?? Obviously, the testers themselves test the testers!!
+# Run this by passing env TEST=true
+_test () {
+  local stdout stderr ret
+  # test basic assert_equal success
+  assert_equal "test with spaces" "test with spaces"
+  # test basic assert_not_equal success
+  assert_not_equal "a a" "b b"
+  # test basic assert_equal success by capturing the stdout, stderr and returncode
+  capture stdout stderr ret assert_equal "test with spaces" "test with spaces"
+  assert_equal "$stdout" "\e[32m.\e[0m" # ansi green .
+  assert_equal "$stderr" ""
+  assert_equal $ret 0
+  # test basic assert_equal failure by capturing the stdout, stderr and returncode
+  capture stdout stderr ret assert_equal "good" "bad"
+  assert_equal "$stdout" "\e[31mF\e[0m" # ansi red F
+  assert_equal "$stderr" "\e[31massert_equal failure: values <good> and <bad> do not match\e[0m"
+  assert_equal $ret 1
+  # test the hex encoder/decoder
+  local testencode testdecode teststring
+  teststring="hello"
+  testencode=$(hex_encode $teststring)
+  testdecode=$(hex_decode $testencode)
+  assert_equal "$teststring" "$testdecode"
+}
+
+testsuite () {
+  _test
+  echo
+  green_text "Success\n"
+}
+
+if [ $TEST ]; then
+  testsuite
+fi
