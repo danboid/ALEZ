@@ -1,11 +1,14 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # shellcheck disable=SC2015
 
 # Arch Linux Easy ZFS (ALEZ) installer 1.2
 # by Dan MacDonald with contributions from John Ramsden
 
 # Exit on error
-set -o errexit -o errtrace
+set -o errexit -o errtrace -o pipefail -o nounset
+# Restrict internal field separator
+IFS=$'\n\t'
+
 
 # Set a default locale during install to avoid mandb error when indexing man pages
 export LANG=C
@@ -19,6 +22,20 @@ version=1.2
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# To make bash booleans "saner"
+# Anything set to these values will be expected to be used like so:
+# value=$true
+# if [ $value ]; then ...
+# if [ ! $value ]; then ...
+# or
+# if [ $value1 ] && [ $value2 ]; then ...
+# or
+# [ $value ] && code_that_only_runs_if_value_is_true
+# or
+# [ $value ] || code_that_only_runs_if_value_is_false
+false=
+true=0
+
 installdir="/mnt"
 archzfs_pgp_key="F75D9D76"
 zroot="zroot"
@@ -29,11 +46,11 @@ repo_remote="danboid/ALEZ"
 HEIGHT=0
 WIDTH=0
 
-show_path=false
+show_path=$false
 
 declare -a base_packages
 base_packages=(
-    'base' 'nano' 'linux-firmware' 'man-db' 'man-pages' 'vi' 'less'
+    'base' 'nano' 'linux-firmware' 'man-db' 'man-pages' 'vi' 'less' 'dialog'
 )
 
 declare -a zpool_bios_features
@@ -46,6 +63,30 @@ zpool_bios_features=(
     'feature@edonr=disabled'
     'feature@userobj_accounting=disabled'
 )
+
+# debug/test IO mode switches
+# The idea is that output normally dumped to /dev/null in prod
+# might want to be visibled somehow in a dev or test env.
+STDOUT=/dev/stdout
+STDERR=/dev/stderr
+DEVNULL=/dev/null
+IO_OUT=$STDOUT
+IO_ERR=$STDERR
+IO_NULL=$DEVNULL
+# redirect all IO output to stdout in debug or test env mode
+PROD=$true
+if [ ${DEBUG:-} ] || [ ${TEST:-} ]; then
+  PROD=$false
+fi
+
+if [ ! $PROD ]; then
+  IO_OUT=$STDOUT
+  IO_ERR=$STDERR
+  IO_NULL=$STDERR
+fi
+
+# Echo to standard error if not in prod, otherwise do nothing (useful for debugging)
+errcho() { [ ! $PROD ] && cat <<< "$@" 1>&2; }
 
 check_latest() {
     # If repo doesn't exist, skip check
@@ -72,7 +113,7 @@ check_latest() {
 }
 
 check_internet() {
-    ping -c 1 archlinux.org &> /dev/null || return 1
+    ping -c 1 archlinux.org &>"${IO_NULL}" || return 1
     return 0
 }
 
@@ -85,7 +126,7 @@ unmount_cleanup() {
     {
         umount -R "${installdir}" || : ;
         zfs umount -a && zpool export "${zroot}" || : ;
-    } &> /dev/null
+    } &>"${IO_NULL}"
 }
 
 bootloader_message() {
@@ -123,7 +164,7 @@ lsdsks() {
 
 update_parts() {
     # shellcheck disable=SC2046
-    mapfile -t partids < <(ls /dev/disk/by-id/* $(${show_path} && ls /dev/vd* || : ;))
+    mapfile -t partids < <(ls /dev/disk/by-id/* $( [ $show_path ] && ls /dev/vd* || : ;))
     ptcount=${#partids[@]}
 }
 
@@ -152,9 +193,9 @@ lsparts() {
 }
 
 zap_partition(){
-    vgchange -an &> /dev/null
-    mdadm --zero-superblock --force "${1}" &> /dev/null
-    sgdisk --zap-all "${1}" &> /dev/null
+    vgchange -an &>"${IO_NULL}"
+    mdadm --zero-superblock --force "${1}" &>"${IO_NULL}"
+    sgdisk --zap-all "${1}" &>"${IO_NULL}"
 }
 
 bios_partitioning(){
@@ -225,7 +266,7 @@ get_matching_kernel() {
         mkdir -p "${pkgdir}"
         {
             pushd "${pkgdir}" && wget "${url}"  && popd
-        } &> /dev/null
+        } &>"${IO_NULL}"
 
         chrun "pacman -U --noconfirm /${pkg}" && rm "${pkgdir}/${pkg}"
 
@@ -235,14 +276,14 @@ get_matching_kernel() {
 }
 
 refresh_mirrors() {
-    pacman -Sy --noconfirm &> /dev/null
+    pacman -Sy --noconfirm &>"${IO_NULL}"
 
-    if hash reflector 2> /dev/null; then
+    if hash reflector 2>"${IO_NULL}"; then
     {
         echo "Refreshing mirrorlist"
         reflector --verbose --latest 25 \
                   --sort rate --save /etc/pacman.d/mirrorlist || :
-    } 2> /dev/null | dialog --progressbox ${HEIGHT} ${WIDTH}
+    } 2>"${IO_NULL}" | dialog --progressbox ${HEIGHT} ${WIDTH}
     fi
 }
 
@@ -255,12 +296,12 @@ install_arch(){
         else
             pacstrap "${installdir}" linux-headers linux "${base_packages[@]}"
         fi
-    } 2> /dev/null
+    } 2>"${IO_NULL}"
 
     chrun "if ! pacman-key -r F75D9D76; then
-               pacman-key -r F75D9D76 --keyserver hkp://pool.sks-keyservers.net:80;
+               pacman-key -r F75D9D76 --keyserver hkps://keyserver.ubuntu.com;
            fi && pacman-key --lsign-key F75D9D76" \
-        "Adding Arch ZFS repo key in chroot..." 2> /dev/null
+        "Adding Arch ZFS repo key in chroot..." 2>"${IO_NULL}"
 
     echo "Add fstab entries..."
     fstab_output="$(genfstab -U "${installdir}")"
@@ -290,7 +331,7 @@ install_arch(){
         else
             chrun "pacman -Sy; pacman -S --noconfirm zfs-linux" "Installing ZFS in chroot..."
         fi
-    } 2> /dev/null
+    } 2>"${IO_NULL}"
 
     echo -e "Enable systemd ZFS service...\n"
     chrun "systemctl enable zfs.target"
@@ -313,7 +354,7 @@ menuentry \"Arch Linux ZFS\" {\n\
 }
 
 install_grub(){
-    chrun "grub-install /dev/${disks[${1}]}" "Installing GRUB to /dev/${disks[${1}]}..." 2> /dev/null
+    chrun "grub-install /dev/${disks[${1}]}" "Installing GRUB to /dev/${disks[${1}]}..." 2>"${IO_NULL}"
 }
 
 install_grub_efi(){
@@ -325,7 +366,7 @@ install_grub_efi(){
         # Install GRUB EFI
         chrun "grub-install --target=x86_64-efi --efi-directory=${1} --bootloader-id=GRUB" \
             "Installing grub-efi to ${1}"
-    } 2> /dev/null
+    } 2>"${IO_NULL}"
 }
 
 gen_sdboot_entry(){
@@ -338,7 +379,7 @@ EOF
 }
 
 install_sdboot(){
-    chrun "bootctl --path=${1} install" "Installing systemd-boot to ${1}" 2> /dev/null
+    chrun "bootctl --path=${1} install" "Installing systemd-boot to ${1}" 2>"${IO_NULL}"
     mkdir -p "${installdir}/${1}/loader/entries"
     if [[ "${kernel_type}" =~ ^(l|L)$ ]]; then
         gen_sdboot_entry "${1}" "linux-lts"
@@ -414,8 +455,11 @@ define() {
 
 fetch_archzfs_key() {
     declare -a keyservers=(
-        'hkp://pool.sks-keyservers.net:80'
-        # 'hkp://pgp.mit.edu:80'                    # Replace with working keyservers
+        'hkps://keyserver.ubuntu.com'
+        'hkps://pgp.mit.edu'
+        'hkp://pgp.mit.edu:80'
+        # SKS keyservers are permanently down due to GDPR filings
+        # 'hkp://pool.sks-keyservers.net:80'
         # 'hkp://ipv4.pool.sks-keyservers.net:80'
     )
 
@@ -429,18 +473,23 @@ fetch_archzfs_key() {
             pacman-key --lsign-key "${archzfs_pgp_key}" && return 0
         fi
     done
-    } &> /dev/null
+    } &>"${IO_NULL}"
     return 1
 }
 
 init_keyring() {
     declare -a keyservers=(
-        'hkp://pool.sks-keyservers.net:80'
-        # 'hkp://pgp.mit.edu:80'                    # Replace with working keyservers
+        'hkps://keyserver.ubuntu.com'
+        'hkps://pgp.mit.edu'
+        'hkp://pgp.mit.edu:80'
+        # SKS keyservers are permanently down due to GDPR filings
+        # 'hkp://pool.sks-keyservers.net:80'
         # 'hkp://ipv4.pool.sks-keyservers.net:80'
     )
 
-    pacman-key --init &> /dev/null
+    pacman -S --noconfirm archlinux-keyring
+    pacman-key --init &>"${IO_NULL}"
+    pacman-key --populate archlinux
 
     {
     # Try default keyserver first
@@ -448,7 +497,7 @@ init_keyring() {
     for ks in "${keyservers[@]}"; do
         pacman-key --refresh-keys --keyserver "${ks}" && return 0
     done
-    } &>/dev/null
+    } &>"${IO_NULL}"
 
     return 1
 }
@@ -521,7 +570,7 @@ fi
 
 # Check if any VirtIO devices exist
 if lsblk | grep -E 'vd.*disk'; then
-    [ -d /dev/disk/by-path/ ] && show_path=true
+    [ -d /dev/disk/by-path/ ] && show_path=$true
 fi
 
 # No frills GPT partitioning
@@ -585,20 +634,36 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
     partinfo="$(get_parts)"
 
     if [ "$zpconf" == "s" ]; then
+        errcho "zpconf=s"
         msg="Select a partition.\n\nIf you used alez to create your partitions,\nyou likely want the one ending with -part2"
         # shellcheck disable=SC2086
         zps=$(dialog --stdout --clear --title "Choose partition" \
                      --menu "${msg}" $HEIGHT $WIDTH "$(( 2 + ptcount))" ${partinfo})
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             # shellcheck disable=SC2046
+            errcho "zpconf=s"
+            errcho "features=$(print_features)"
+            errcho "zroot=${zroot}"
+            errcho "zps=$zps"
+            errcho "partids=${partids[$zps]}"
+            errcho "install_type=${install_type}"
+            errcho "zpool create -f -d -m none -o ashift=12 $(print_features) ${zroot} ${partids[$zps]}"
             zpool create -f -d -m none -o ashift=12 $(print_features) "${zroot}" "${partids[$zps]}"
         else
+            errcho "zpconf=s"
+            errcho "features=$(print_features)"
+            errcho "zroot=${zroot}"
+            errcho "zps=$zps"
+            errcho "partids=${partids[$zps]}"
+            errcho "install_type=${install_type}"
+            errcho "zpool create -f -d -m none -o ashift=12 ${zroot} ${partids[$zps]}"
             zpool create -f -d -m none -o ashift=12 "${zroot}" "${partids[$zps]}"
         fi
         dialog --title "Success" --msgbox "Created a single disk zpool with ${partids[$zps]}...." ${HEIGHT} ${WIDTH}
         break
     elif [ "$zpconf" == "m" ]; then
         # shellcheck disable=SC2086
+        errcho "zpconf=m"
         zp1=$(dialog --stdout --clear --title "First zpool partition" \
                      --menu "Select the number of the first partition" $HEIGHT $WIDTH "$(( 2 + ptcount ))" ${partinfo})
         # shellcheck disable=SC2086
@@ -608,10 +673,26 @@ while dialog --clear --title "New zpool?" --yesno "${msg}" $HEIGHT $WIDTH; do
         echo "Creating a mirrored zpool..."
         if [[ "${install_type}" =~ ^(b|B)$ ]]; then
             # shellcheck disable=SC2046
+            errcho "zpconf=m"
+            errcho "features=$(print_features)"
+            errcho "zroot=${zroot}"
+            errcho "zp1=$zp1"
+            errcho "zp2=$zp2"
+            errcho "partids=${partids[$zp1]},${partids[$zp2]}"
+            errcho "install_type=${install_type}"
+            errcho "zpool create ${zroot} mirror -f -d -m none -o ashift=12 $(print_features) ${partids[$zp1]} ${partids[$zp2]}"
             zpool create "${zroot}" mirror -f -d -m none \
                 -o ashift=12 \
                 $(print_features) "${partids[$zp1]}" "${partids[$zp2]}"
         else
+            errcho "zpconf=m"
+            errcho "features=$(print_features)"
+            errcho "zroot=${zroot}"
+            errcho "zp1=$zp1"
+            errcho "zp2=$zp2"
+            errcho "partids=${partids[$zp1]},${partids[$zp2]}"
+            errcho "install_type=${install_type}"
+            errcho "zpool create ${zroot} mirror -f -d -m none -o ashift=12 ${partids[$zp1]} ${partids[$zp2]}"
             zpool create "${zroot}" mirror -f -d -m none -o ashift=12 "${partids[$zp1]}" "${partids[$zp2]}"
         fi
         dialog --title "Success" --msgbox "Created a mirrored zpool with ${partids[$zp1]} ${partids[$zp2]}...." ${HEIGHT} ${WIDTH}
@@ -625,7 +706,7 @@ done
     zfs create -o mountpoint=none "${zroot}"/data
     zfs create -o mountpoint=legacy "${zroot}"/data/home
 
-    { zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &> /dev/null
+    { zfs create -o mountpoint=/ "${zroot}"/ROOT/default || : ; }  &>"${IO_NULL}"
 
     # GRUB only datasets
     if [[ "${bootloader}" =~ ^(g|G)$ ]]; then
@@ -678,6 +759,7 @@ if [[ "${install_type}" =~ ^(u|U)$ ]]; then
                  $HEIGHT $WIDTH "$(( 2 + ptcount))" ${partinfo})
 
     efi_partition="${partids[$esp]}"
+    errcho "mkfs.fat -F 32 ${efi_partition}"
     mkfs.fat -F 32 "${efi_partition}"| dialog --progressbox 10 70
 
     mkdir -p "${installdir}${esp_mountpoint}" "${installdir}/boot"
@@ -691,26 +773,30 @@ fi
 
 dialog --title "Begin install?" --msgbox "Setup complete, begin install?" ${HEIGHT} ${WIDTH}
 
+errcho "Initializing keyring..."
 if ! init_keyring; then
     dialog --title "Installation error" \
         --msgbox "ERROR: Failed to initialize keyring" ${HEIGHT} ${WIDTH}
     exit 1
 fi
 
+errcho "Fetching archzfs key..."
 if ! fetch_archzfs_key; then
     dialog --title "Installation error" \
         --msgbox "ERROR: Failed to fetch archzfs key" ${HEIGHT} ${WIDTH}
     exit 1
 fi
 
+errcho "Refreshing mirrors..."
 refresh_mirrors
 
+errcho "Installing arch..."
 install_arch | dialog --progressbox 30 70
 
 # Install GRUB BIOS
 if [[ "${install_type}" =~ ^(b|B)$ ]]; then
 
-    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." 2> /dev/null | dialog --progressbox 30 70
+    chrun "pacman -S --noconfirm grub os-prober" "Installing GRUB in chroot..." 2>"${IO_NULL}" | dialog --progressbox 30 70
 
     add_grub_entry
 
@@ -748,7 +834,7 @@ else
         else
             install_grub_efi "${esp_mountpoint}"
         fi
-    } 2> /dev/null | dialog --progressbox 30 70
+    } 2>"${IO_NULL}" | dialog --progressbox 30 70
 fi
 
 {
@@ -758,7 +844,7 @@ fi
     else
         chrun "mkinitcpio -p linux"
     fi
-} 2> /dev/null | dialog --progressbox 30 70
+} 2>"${IO_NULL}" | dialog --progressbox 30 70
 
 unmount_cleanup
 
