@@ -72,9 +72,37 @@ _assert_equality_or_lack_thereof () {
 }
 assert_equal () {
   _assert_equality_or_lack_thereof "==" "$1" "$2"
+  return $?
 }
 assert_not_equal () {
   _assert_equality_or_lack_thereof "!=" "$1" "$2"
+  return $?
+}
+assert_success () {
+  local stdout stderr ret
+  capture stdout stderr ret "$*"
+  if [ $ret = 0 ]; then
+    green_text "."
+    return 0
+  else
+    red_text "F"
+    red_text "assert_success failure: <$*>" >&2
+    echo "" >&2
+    return 1
+  fi
+}
+assert_failure () {
+  local stdout stderr ret
+  capture stdout stderr ret "$*"
+  if [ $ret != 0 ]; then
+    green_text "."
+    return 0
+  else
+    red_text "F"
+    red_text "asserted failure, but it actually succeeded: <$*>" >&2
+    echo "" >&2
+    return 1
+  fi
 }
 
 # Who tests the testers?? Obviously, the testers themselves test the testers!!
@@ -83,6 +111,7 @@ _test () {
   local stdout stderr ret
   # test basic assert_equal success
   assert_equal "test with spaces" "test with spaces"
+  assert_equal "\"quoted 'stuff'\"" "\"quoted 'stuff'\""
   # test basic assert_not_equal success
   assert_not_equal "a a" "b b"
   # test basic assert_equal success by capturing the stdout, stderr and returncode
@@ -101,12 +130,29 @@ _test () {
   testencode=$(hex_encode $teststring)
   testdecode=$(hex_decode $testencode)
   assert_equal "$teststring" "$testdecode"
+  # test success and failure assertions
+  assert_success ls
+  assert_failure ls thisfilebetternotexist
 }
 
 testsuite () {
-  _test
-  echo
-  green_text "Success\n"
+  local stdout stderr ret
+  capture stdout stderr ret _test
+  echo -e $stdout
+  echo -en $stderr
+  # for some reason I couldn't propagate the return code without adding "|| return 1" to every assert line in _test, which is lame.
+  # I thought -o errexit did this? Anyway, I just look at the stderr of the test suite itself to determine, for now.
+  if [[ $stderr == "" ]]; then
+    echo
+    green_text "Success"
+    echo
+    return 0
+  else
+    echo
+    red_text "Failure"
+    echo
+    return 1
+  fi
 }
 
 if [ $TEST ]; then
